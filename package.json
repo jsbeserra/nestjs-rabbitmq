@@ -1,0 +1,36 @@
+{
+  "name": "nestjs-haremq",
+  "version": "0.0.12-dev-1",
+  "description": "",
+  "main": "dist/index.js",
+  "author": "Bruno Galdino",
+  "license": "MIT",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rimraf dist && tsc",
+    "prepublish": "yarn run build"
+  },
+  "dependencies": {
+    "amqp-connection-manager": "^4.1.14",
+    "amqplib": "^0.10.3",
+    "reflect-metadata": "^0.2.1",
+    "rimraf": "^5.0.5",
+    "rxjs": "^7.8.1"
+  },
+  "peerDependencies": {
+    "@nestjs/common": ">9"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^10.3.1",
+    "@types/amqplib": "^0.10.5",
+    "@types/node": "^20.11.16",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  },
+  "files": [
+    "dist/"
+  ]
+}
