@@ -122,10 +122,20 @@ export type RabbitMQModuleOptions = {
   connectionString: string | string[];
 
   /** The name of the squad you belong */
-  squadName: string;
+  delayExchangeName: string;
 
-  /** When true, the connection will be made synchronously during the OnModuleInit lifecycle
+  /** When **TRUE** the SDK will not initiate the consumers automatically during the _OnModuleInit_
+   * To initiate the consumer, you can call it at the end of the `bootstrap()` on your `main.ts` file
+   * ```javascript
+   * const rabbitService: RabbitMQService = app.get(RabbitMQService);
+   * await rabbitService.beginConsumers();
+   * ```
+   * Default: false */
+  consumerManualLoad?: boolean;
+
+  /** When **TRUE**, the connection will be made synchronously during the `OnModuleInit` lifecycle
    * and will only return after the connection is sucessfully made
+   * When **FALSE**, the connection is made asynchronously and will release the lifecycle event as fast as possible.
    * Default: true */
   waitConnection?: boolean;
 

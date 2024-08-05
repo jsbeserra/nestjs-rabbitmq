@@ -1,6 +1,6 @@
 {
-  "name": "nestjs-haremq",
-  "version": "0.0.12-dev-1",
+  "name": "nestjs-rabbitmq",
+  "version": "0.0.12",
   "description": "",
   "main": "dist/index.js",
   "author": "Bruno Galdino",
