@@ -1,7 +1,7 @@
 import { DynamicModule, Module, Type } from "@nestjs/common";
 import { AMQPConnectionManager } from "./amqp-connection-manager";
-import { RabbitOptionsFactory } from "./rabbitmq-options.interface";
 import { RabbitMQService } from "./rabbitmq-service";
+import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
 
 export type RabbitOptions = {
   useClass: Type<RabbitOptionsFactory>;
@@ -11,11 +11,6 @@ export type RabbitOptions = {
 @Module({})
 export class RabbitMQModule {
   static register(options: RabbitOptions): DynamicModule {
-    // const rabbitPublisherProvider = {
-    //   provide: RabbitMQService,
-    //   useValue: singletonPublihser,
-    // };
-
     return {
       module: RabbitMQModule,
       imports: [...(options?.imports ?? [])],
@@ -26,7 +21,6 @@ export class RabbitMQModule {
           provide: "RABBIT_OPTIONS",
           useClass: options.useClass,
         },
-        // rabbitPublisherProvider,
         RabbitMQService,
       ],
       exports: [RabbitMQService],

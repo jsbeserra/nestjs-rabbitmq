@@ -1,21 +1,7 @@
-import { ChannelWrapper } from "amqp-connection-manager";
-import { ConfirmChannel, ConsumeMessage } from "amqplib";
-export type RabbitConsumerParameters = {
-  message: ConsumeMessage;
-  channel: ConfirmChannel;
-  queue: string;
-};
-export type LogType = "all" | "consumer" | "publisher" | "none";
-
-export interface IRabbitHandler<T = any> {
-  (content: T, parameters?: RabbitConsumerParameters): Promise<void>;
-}
-
-export interface IDelayProgression {
-  (attempt: number): number;
-}
+import { IDelayProgression, IRabbitHandler } from "./rabbitmq.interfaces";
 
 export type RabbitMQExchangeTypes = "direct" | "topic" | "fanout" | "headers";
+export type LogType = "all" | "consumer" | "publisher" | "none";
 
 export type RabbitMQConsumerOptions = {
   /** Declare the queue parameters and operation */
@@ -150,15 +136,6 @@ export type RabbitMQModuleOptions = {
   /** Array of consumers that will be attached to the application*/
   consumerChannels?: Array<RabbitMQConsumerChannel>;
 };
-
-export interface RabbitOptionsFactory {
-  createRabbitOptions(): RabbitMQModuleOptions;
-}
-
-export interface RabbitChannel {
-  exchangeType: string;
-  wrapper: ChannelWrapper;
-}
 
 export type PublishOptions = {
   expiration?: string | number | undefined;
