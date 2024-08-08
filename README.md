@@ -23,6 +23,8 @@
   - [Disabling the automatic ack](#disabling-the-automatic-ack)
   - [Message inspection and logging](#message-inspection-and-logging)
   - [How to build this library locally ?](#how-to-build-this-library-locally)
+- [Planned features](#planned-features)
+- [Contribute](#contribute)
 - [License](#license)
 <!--toc:end-->
 
