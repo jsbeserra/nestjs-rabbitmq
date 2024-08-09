@@ -423,7 +423,7 @@ And should be good to go
 - [ ] Improve semantics of the config file
 - [ ] Offer a retry mechanism without the `x-delay`
 - [ ] Make the publisher method strongly typed based on the `assertExchanges`
-      `exchageName` and `routingKeys` configurations
+      `exchangeName` and `routingKeys` configurations
 
 ## Contribute
 

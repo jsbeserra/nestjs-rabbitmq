@@ -13,7 +13,7 @@ import {
 } from "amqp-connection-manager";
 import { ConfirmChannel } from "amqplib";
 import { hostname } from "node:os";
-import { RabbitMQModuleOptions } from "src/rabbitmq.types";
+import { RabbitMQModuleOptions } from "./rabbitmq.types";
 import { RabbitMQConsumer } from "./rabbitmq-consumers";
 import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
 

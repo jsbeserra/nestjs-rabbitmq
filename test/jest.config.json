@@ -1,0 +1,12 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "../",
+  "testEnvironment": "node",
+  "testRegex": ".spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": ["ts-jest"]
+  },
+  "coverageDirectory": "./coverage",
+  "coverageReporters": ["html-spa", "lcovonly", "text-summary"],
+  "collectCoverageFrom": ["src/**/*.ts"]
+}
