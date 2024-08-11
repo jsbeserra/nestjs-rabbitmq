@@ -3,7 +3,7 @@ import {
   IRabbitConsumer,
   RabbitConsumerParameters,
   RabbitMQService,
-} from "../../";
+} from "../../src";
 
 @Injectable()
 export class RmqTestService implements IRabbitConsumer {

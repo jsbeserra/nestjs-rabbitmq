@@ -139,7 +139,7 @@ export class RabbitOptions implements RabbitOptionsFactory {
 assertExchanges: [
   { name: 'webhooks', type: 'topic',options: { durable: true, autoDelete: false } },
   { name: 'test-fanout', type: 'fanout' },
-  { name: 'example-direct', type: 'direct', , options: {exchangeSuffix: '.mySufix'}},
+  { name: 'example-direct', type: 'direct'},
 ],
 ```
 
@@ -149,10 +149,6 @@ and each entry will asserted against the RabbitMQ connected server.
 If any entry does not match a current configuration, or cannot be
 created/attached. A terminal error `406 - PRECONDITION_FAILED` will be thrown
 with the reason and the server will not initialize
-
-By default every exchange will have the `.exchange` attached to its name.
-If you want to remove this, you can pass an empty value to the
-`exchangeSuffix` property
 
 ### Publishing messages
 

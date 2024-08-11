@@ -1,5 +1,4 @@
 import { AmqpConnectionManager, ChannelWrapper } from "amqp-connection-manager";
-import { AMQPConnectionManager } from "./amqp-connection-manager";
 import { IRabbitHandler } from "./rabbitmq.interfaces";
 import { ConfirmChannel, ConsumeMessage } from "amqplib";
 import {
@@ -38,50 +37,44 @@ export class RabbitMQConsumer {
       "none";
   }
 
-  public async createConsumers(): Promise<void> {
-    for (const consumerEntry of this.options?.consumerChannels ?? []) {
-      const consumer = consumerEntry.options;
-      const exchangeBindName = consumer.exchangeName.endsWith(
-        consumer.suffixOptions?.exchangeSuffix ?? ".exchange",
-      )
-        ? consumer.exchangeName
-        : `${consumer.exchangeName}${consumer.suffixOptions?.exchangeSuffix ?? ".exchange"}`;
+  public async createConsumer(
+    consumer: RabbitMQConsumerOptions,
+    messageHandler: IRabbitHandler,
+  ): Promise<ChannelWrapper> {
+    const consumerChannel = this.connection.createChannel({
+      confirm: true,
+      name: consumer.queue,
+      setup: (channel: ConfirmChannel) => {
+        return Promise.all([
+          channel.prefetch(consumer.prefetch ?? 10),
+          channel.assertQueue(consumer.queue, {
+            durable: consumer.durable ?? true,
+            autoDelete: consumer.autoDelete ?? false,
+            deadLetterRoutingKey: `${consumer.queue}${consumer.suffixOptions?.dlqSuffix ?? ".dlq"}`,
+            deadLetterExchange: "",
+          }),
 
-      this.connection.createChannel({
-        confirm: true,
-        name: consumer.queue,
-        setup: (channel: ConfirmChannel) => {
-          return Promise.all([
-            channel.prefetch(consumer.prefetch ?? 10),
-            channel.assertQueue(consumer.queue, {
-              durable: consumer.durable ?? true,
-              autoDelete: consumer.autoDelete ?? false,
-              deadLetterRoutingKey: `${consumer.queue}${consumer.suffixOptions?.dlqSuffix ?? ".dlq"}`,
-              deadLetterExchange: "",
-            }),
+          channel.bindQueue(
+            consumer.queue,
+            consumer.exchangeName,
+            consumer.routingKey,
+          ),
 
-            channel.bindQueue(
-              consumer.queue,
-              exchangeBindName,
-              consumer.routingKey,
-            ),
+          this.attachRetryAndDLQ(channel, consumer),
 
-            this.attachRetryAndDLQ(channel, consumer),
+          channel.consume(consumer.queue, async (message) => {
+            await this.processConsumerMessage(
+              message,
+              channel,
+              consumer,
+              messageHandler,
+            );
+          }),
+        ]);
+      },
+    });
 
-            channel.consume(consumer.queue, async (message) => {
-              await this.processConsumerMessage(
-                message,
-                channel,
-                consumer,
-                consumerEntry.messageHandler,
-              );
-            }),
-          ]);
-        },
-      });
-    }
-
-    AMQPConnectionManager.isConsumersLoaded = true;
+    return consumerChannel;
   }
 
   private async processConsumerMessage(

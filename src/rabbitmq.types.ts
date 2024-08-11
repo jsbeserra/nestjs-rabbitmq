@@ -51,7 +51,6 @@ export type RabbitMQConsumerOptions = {
 
   /** Override default suffix that are defined in this library */
   suffixOptions?: {
-    exchangeSuffix?: string;
     dlqSuffix?: string;
   };
 };
@@ -81,10 +80,6 @@ export type RabbitMQAssertExchange = {
      * **WARNING**: RabbitMQ will delete the queue no matter the amount of messages enqueued.
      * Default: false */
     autoDelete?: boolean;
-
-    /** Override default suffix that are defined in this library.
-     * Default: '.exchange'*/
-    exchangeSufix?: string;
 
     /** Declare the exchange as a delayed one, in this scenario the exchange will be declated as a `x-delayed-message` with an argument `x-delayed-type: ${type}`
      * Default: false */

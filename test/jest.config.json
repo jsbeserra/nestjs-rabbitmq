@@ -7,6 +7,7 @@
     "^.+\\.(t|j)s$": ["ts-jest"]
   },
   "coverageDirectory": "./coverage",
-  "coverageReporters": ["html-spa", "lcovonly", "text-summary"],
-  "collectCoverageFrom": ["src/**/*.ts"]
+  "coverageReporters": ["lcovonly", "text"],
+  "collectCoverageFrom": ["src/**/*.ts"],
+  "globalTeardown": "<rootDir>/test/global-teardown.ts"
 }

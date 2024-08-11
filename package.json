@@ -14,7 +14,7 @@
   "license": "MIT",
   "types": "dist/index.d.ts",
   "scripts": {
-    "test": "NODE_ENV=test node --expose-gc ./node_modules/jest/bin/jest.js --maxWorkers=70% --config ./test/jest.config.json --logHeapUsage",
+    "test": "NODE_ENV=develop node --expose-gc ./node_modules/jest/bin/jest.js --config ./test/jest.config.json --logHeapUsage --coverage",
     "build": "rimraf dist && tsc",
     "prepublish": "pnpm run build"
   },
