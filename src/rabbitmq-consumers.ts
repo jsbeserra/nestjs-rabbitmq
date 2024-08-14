@@ -160,10 +160,10 @@ export class RabbitMQConsumer {
       consumer.retryStrategy.enabled === undefined ||
       consumer?.retryStrategy.enabled
     ) {
-      const retryCount = message.properties?.headers?.["retriesCount"] ?? 1;
+      const retryCount = message.properties?.headers?.["retriesCount"] ?? 0;
       const maxRetry = consumer?.retryStrategy?.maxAttempts ?? 5;
 
-      if (retryCount <= maxRetry) {
+      if (retryCount < maxRetry) {
         const retryDelay = consumer?.retryStrategy?.delay?.(retryCount) ?? 5000;
 
         try {
