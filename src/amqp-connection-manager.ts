@@ -29,6 +29,14 @@ export class AMQPConnectionManager
     "access-refused",
     "closed via management plugin",
   ];
+
+  private defaultOptions: Partial<RabbitMQModuleOptions> = {
+    extraOptions: {
+      connectionType: "sync",
+      logType: "none",
+      consumerManualLoad: false,
+    },
+  };
   public static rabbitModuleOptions: RabbitMQModuleOptions;
   public static publishChannelWrapper: ChannelWrapper = null;
   public static connection: AmqpConnectionManager;
@@ -37,19 +45,21 @@ export class AMQPConnectionManager
   private connectionBlockedReason: string;
 
   constructor(@Inject("RABBIT_OPTIONS") options: RabbitOptionsFactory) {
-    AMQPConnectionManager.rabbitModuleOptions = options.createRabbitOptions();
+    AMQPConnectionManager.rabbitModuleOptions = {
+      ...this.defaultOptions,
+      ...options.createRabbitOptions(),
+    };
   }
 
   async onModuleInit() {
-    if (process.env.NODE_ENV != "test") {
-      return this.connect();
-    }
+    return this.connect();
   }
 
   async onApplicationBootstrap() {
-    if (AMQPConnectionManager.rabbitModuleOptions?.consumerManualLoad == true)
+    if (
+      AMQPConnectionManager.rabbitModuleOptions.extraOptions.consumerManualLoad
+    )
       return;
-
     await this.createConsumers();
 
     this.logger.debug("Initiating RabbitMQ consumers automatically");
@@ -57,68 +67,11 @@ export class AMQPConnectionManager
 
   async onApplicationShutdown() {
     this.logger.log("Closing RabbitMQ Connection");
-
-    await AMQPConnectionManager.publishChannelWrapper.close();
-
-    for (const consumer of this.consumers) {
-      await consumer.close();
-    }
-
     await AMQPConnectionManager?.connection?.close();
   }
 
   getConsumers() {
     return this.consumers;
-  }
-
-  private attachEvents(resolve) {
-    if (AMQPConnectionManager.rabbitModuleOptions?.waitConnection === false)
-      resolve(true);
-
-    this.getConnection().on("connect", async ({ url }: { url: string }) => {
-      this.logger.log(
-        `Rabbit connected to ${url.replace(
-          new RegExp(url.replace(/amqp:\/\/[^:]*:([^@]*)@.*?$/i, "$1"), "g"),
-          "***",
-        )}`,
-      );
-      resolve(true);
-    });
-
-    this.getConnection().on("disconnect", ({ err }) => {
-      console.warn(`Disconnected from rabbitmq: ${err.message}`);
-      console.log("ENTROU");
-
-      if (
-        this.rabbitTerminalErrors.some((errorMessage) =>
-          err.message.toLowerCase().includes(errorMessage),
-        )
-      ) {
-        this.getConnection().close();
-        console.error(
-          "RabbitMQ Disconnected with a terminal error, impossible to reconnect",
-        );
-      }
-    });
-
-    this.getConnection().on("connectFailed", ({ err }) => {
-      console.error(`Failure to connect to RabbitMQ instance: ${err.message}`);
-    });
-
-    this.getConnection().on("blocked", ({ reason }) => {
-      console.error(`RabbitMQ broker is blocked with reason: ${reason}`);
-      this.connectionBlockedReason = reason;
-    });
-
-    this.getConnection().on("unblocked", () => {
-      console.error(
-        `RabbitMQ broker connection is unblocked, last reason was: ${this.connectionBlockedReason}`,
-      );
-    });
-  }
-
-  private getConnection() {
-    return AMQPConnectionManager.connection;
   }
 
   private async connect() {
@@ -143,6 +96,60 @@ export class AMQPConnectionManager
     });
 
     await this.assertExchanges();
+  }
+
+  private attachEvents(resolve: any) {
+    if (
+      AMQPConnectionManager.rabbitModuleOptions.extraOptions.connectionType ===
+      "async"
+    )
+      resolve(true);
+
+    this.getConnection().on("connect", async ({ url }: { url: string }) => {
+      this.logger.log(
+        `Rabbit connected to ${url.replace(
+          new RegExp(url.replace(/amqp:\/\/[^:]*:([^@]*)@.*?$/i, "$1"), "g"),
+          "***",
+        )}`,
+      );
+      resolve(true);
+    });
+
+    this.getConnection().on("disconnect", ({ err }) => {
+      this.logger.warn(`Disconnected from rabbitmq: ${err.message}`);
+
+      if (
+        this.rabbitTerminalErrors.some((errorMessage) =>
+          err.message.toLowerCase().includes(errorMessage),
+        )
+      ) {
+        this.getConnection().close();
+        this.logger.error(
+          "RabbitMQ Disconnected with a terminal error, impossible to reconnect",
+        );
+      }
+    });
+
+    this.getConnection().on("connectFailed", ({ err }) => {
+      this.logger.error(
+        `Failure to connect to RabbitMQ instance: ${err.message}`,
+      );
+    });
+
+    this.getConnection().on("blocked", ({ reason }) => {
+      this.logger.error(`RabbitMQ broker is blocked with reason: ${reason}`);
+      this.connectionBlockedReason = reason;
+    });
+
+    this.getConnection().on("unblocked", () => {
+      this.logger.error(
+        `RabbitMQ broker connection is unblocked, last reason was: ${this.connectionBlockedReason}`,
+      );
+    });
+  }
+
+  private getConnection() {
+    return AMQPConnectionManager.connection;
   }
 
   private async assertExchanges(): Promise<void> {

@@ -27,8 +27,13 @@ export const TestConsumers: RabbitMQConsumerOptions[] = [
   {
     queue: "test_direct_queue_2",
     exchangeName: "test_direct.exchange",
-    routingKey: "test_direct_queue",
+    routingKey: "test_direct_queue_2",
     prefetch: 1,
+    retryStrategy: {
+      enabled: true,
+      maxAttempts: 1,
+      delay: (attempt) => attempt,
+    },
   },
 ];
 
@@ -43,6 +48,10 @@ export class RmqTestConfig implements RabbitOptionsFactory {
       connectionString: "amqp://localhost:5672",
       delayExchangeName: delayExchangeName,
       assertExchanges: TestExchanges,
+      extraOptions: {
+        connectionType: "sync",
+        logType: "all",
+      },
       consumerChannels: [
         {
           options: {
@@ -54,7 +63,7 @@ export class RmqTestConfig implements RabbitOptionsFactory {
           options: {
             ...TestConsumers[1],
           },
-          messageHandler: this.rmqTest.testHandler2.bind(this.rmqTest),
+          messageHandler: this.rmqTest.throwHandler.bind(this.rmqTest),
         },
       ],
     };

@@ -28,7 +28,7 @@ describe("AMQPConnectionManager Late Loading", () => {
     }).compile();
 
     moduleRef = await moduleRef.init();
-
+    moduleRef.useLogger(false);
     rabbitMqService = moduleRef.get(RabbitMQService);
 
     await AMQPConnectionManager.publishChannelWrapper.waitForConnect();

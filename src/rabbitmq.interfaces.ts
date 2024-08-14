@@ -1,6 +1,7 @@
 import { ChannelWrapper } from "amqp-connection-manager";
 import { ConfirmChannel, ConsumeMessage } from "amqplib";
 import { RabbitMQModuleOptions } from "./rabbitmq.types";
+
 export type RabbitConsumerParameters = {
   message: ConsumeMessage;
   channel: ConfirmChannel;

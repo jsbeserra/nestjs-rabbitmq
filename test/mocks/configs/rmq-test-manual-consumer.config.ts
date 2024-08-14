@@ -13,7 +13,11 @@ export class RmqTestManualConsumerConfig implements RabbitOptionsFactory {
     return {
       connectionString: "amqp://localhost:5672",
       delayExchangeName: delayExchangeName,
-      consumerManualLoad: true,
+      extraOptions: {
+        consumerManualLoad: true,
+        logType: "none",
+        connectionType: "async",
+      },
       assertExchanges: [{ name: "test_direct.exchange", type: "direct" }],
       consumerChannels: [
         {

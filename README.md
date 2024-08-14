@@ -264,7 +264,7 @@ export class MyClass implements IRabbitConsumer<MyInterface> {
 }
 ```
 
-### Consumer late loading
+### Consumer manual loading
 
 This library attaches the consumers during the `OnApplicationBootstrap` lifecycle
 of the NestJS Application, meaning that the application will begin to receive
@@ -272,8 +272,8 @@ messages as soon as the lifecycle is done.
 
 If your application needs some time to initiate the consumers for some reason,
 (pods with limited resource for example), you can set the flag
-`consumerManualLoad: true` on the configuration file and manually call the
-consumer instantiation.
+`extraOptions.consumerManualLoad: true` on the configuration file and manually
+call the consumer instantiation.
 
 **Example:**
 
@@ -397,7 +397,7 @@ public async messageHandler(content: any, params: RabbitConsumerParameters): Pro
 ## Message inspection and logging
 
 You can inspect the consumer/publisher messages by setting the parameter
-`trafficInspection` or setting the environment variable `RABBITMQ_TRAFFIC_TYPE`
+`extraOptions.logType` or setting the environment variable `RABBITMQ_LOG_TYPE`
 to either: `all | consumer | publisher | none`.
 
 The default value is `none`

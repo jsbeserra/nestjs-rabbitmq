@@ -7,7 +7,7 @@ import { ChannelWrapper } from "amqp-connection-manager";
 
 export class RabbitMQService {
   private logger = new Logger(RabbitMQService.name);
-  private consumers: ChannelWrapper[] = [];
+
   /**
    * Check status of the main conenection to the broker.
    * @returns {number} 1 - Online | 0 - Offline
@@ -35,8 +35,8 @@ export class RabbitMQService {
     let hasErrors = null;
 
     try {
-      if (AMQPConnectionManager.connection) {
-        return AMQPConnectionManager.publishChannelWrapper.publish(
+      try {
+        await AMQPConnectionManager.publishChannelWrapper.publish(
           exchangeName,
           routingKey,
           JSON.stringify(message),
@@ -46,8 +46,8 @@ export class RabbitMQService {
             headers: { "x-delay": 0, ...options?.headers },
           },
         );
-      } else {
-        throw new Error("Connection with RabbitMQ is closed. Cannot publish");
+      } catch (e) {
+        hasErrors = e;
       }
     } catch (e) {
       hasErrors = e;
@@ -101,32 +101,25 @@ export class RabbitMQService {
   ): void {
     if (
       !["publisher", "all"].includes(
-        AMQPConnectionManager.rabbitModuleOptions.trafficInspection,
+        AMQPConnectionManager.rabbitModuleOptions.extraOptions.logType,
       ) &&
       !error
     )
       return;
 
-    const logLevel = error ? "error" : "info";
-    const message = `[AMQP] [PUBLISH] [${exchange}] [${routingKey}]`;
+    const logLevel = error ? "error" : "log";
     const logData = {
       logLevel,
       correlationId: properties?.correlationId,
-      title: message,
+      title: `[AMQP] [PUBLISH] [${exchange}] [${routingKey}]`,
       binding: { exchange, routingKey },
       message: { content, properties },
     };
 
-    if (error)
+    if (error) {
       Object.assign(logData, { error: error.message ?? error.toString() });
+    }
 
-    console[logLevel](JSON.stringify(logData));
-
-    // this.logger[logLevel]({
-    //   log
-    //   message,
-    //   amqp: logData,
-    //   error,
-    // });
+    this.logger[logLevel](JSON.stringify(logData));
   }
 }

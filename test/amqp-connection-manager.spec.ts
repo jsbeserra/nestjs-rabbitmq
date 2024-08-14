@@ -1,5 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import {
+  delayExchangeName,
   RmqTestConfig,
   TestConsumers,
   TestExchanges,
@@ -10,15 +11,36 @@ import { RmqTestService } from "./mocks/rmq-test.service";
 import { RabbitMQService } from "../src/rabbitmq-service";
 import { AMQPConnectionManager } from "../src/amqp-connection-manager";
 import { once } from "events";
+import { RabbitMQConsumer } from "../src/rabbitmq-consumers";
+import { Logger } from "@nestjs/common";
 
-describe("RabbitMQModule", () => {
+export const sleep = (ms: number = 200) => {
+  return new Promise<void>((resolve) =>
+    setTimeout(() => {
+      resolve();
+    }, ms),
+  );
+};
+
+describe("AMQPConnectionManager", () => {
   let rabbitMqService: RabbitMQService;
   let amqpManager: AMQPConnectionManager;
   let testService: RmqTestService;
   let moduleRef: TestingModule;
-  let publishSpy;
+  let globalConsumerCallbackSpy: any;
+  let globalConsumerThrowSpy: any;
 
   beforeAll(async () => {
+    globalConsumerCallbackSpy = jest.spyOn(
+      RmqTestService.prototype,
+      "messageHandler",
+    );
+
+    globalConsumerThrowSpy = jest.spyOn(
+      RmqTestService.prototype,
+      "throwHandler",
+    );
+
     moduleRef = await Test.createTestingModule({
       imports: [
         RmqTestModule,
@@ -29,6 +51,7 @@ describe("RabbitMQModule", () => {
       ],
     }).compile();
 
+    moduleRef.useLogger(false);
     moduleRef = await moduleRef.init();
 
     amqpManager = moduleRef.get(AMQPConnectionManager);
@@ -40,12 +63,10 @@ describe("RabbitMQModule", () => {
     for (const consumer of amqpManager.getConsumers()) {
       await consumer.waitForConnect();
     }
+  });
 
-    publishSpy = jest
-      .spyOn(RabbitMQService.prototype, "publish")
-      .mockImplementation(async () => {
-        return true;
-      });
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   afterAll(async () => {
@@ -56,8 +77,12 @@ describe("RabbitMQModule", () => {
     expect(testService.rabbitService.checkHealth()).toBeTruthy();
   });
 
-  it("should completely stop the connection if error is terminal", async () => {
-    // expect(spyEvents).toHaveBeenCalled();
+  it("should assert the retry delay exchange", async () => {
+    expect(
+      await AMQPConnectionManager.publishChannelWrapper.checkExchange(
+        delayExchangeName + ".delay",
+      ),
+    ).toBeDefined();
   });
 
   describe("Publisher", () => {
@@ -78,16 +103,38 @@ describe("RabbitMQModule", () => {
       }
     });
 
-    it("should publish a message to a declared exchange", async () => {
+    it("should publish a message to a declared exchange and log it", async () => {
+      jest.clearAllMocks();
+
+      const spy = jest.spyOn(RabbitMQService.prototype, "publish");
+      const loggerSpy = jest.spyOn(Logger.prototype, "log");
+      jest
+        .spyOn(RmqTestService.prototype, "messageHandler")
+        .mockImplementation(async () => {});
+
       const isPublished = await rabbitMqService.publish(
         TestConsumers[0].exchangeName,
         TestConsumers[0].routingKey,
-        {},
+        { test: "published" },
       );
 
-      expect(publishSpy).toHaveBeenCalled();
+      expect(spy).toHaveBeenCalled();
       expect(isPublished).toBeTruthy();
-      jest.restoreAllMocks();
+
+      expect(loggerSpy).toHaveBeenCalled();
+      expect(JSON.parse(loggerSpy.mock.lastCall?.[0])).toMatchObject(
+        expect.objectContaining({
+          logLevel: "log",
+          title: `[AMQP] [PUBLISH] [${TestConsumers[0].exchangeName}] [${TestConsumers[0].routingKey}]`,
+          binding: {
+            routingKey: TestConsumers[0].routingKey,
+            exchange: TestConsumers[0].exchangeName,
+          },
+          message: {
+            content: { test: "published" },
+          },
+        }),
+      );
     });
   });
 
@@ -109,6 +156,99 @@ describe("RabbitMQModule", () => {
           ),
         ).toBeDefined();
       }
+    });
+
+    it("should throw an error if consumers are already loaded", async () => {
+      await expect(rabbitMqService.createConsumers()).rejects.toThrow(
+        "Consumers already initialized. If you wish to start it manually, see consumeManualLoad",
+      );
+    });
+
+    it("should have one .dlq for each queue", async () => {
+      for (const queue of TestConsumers) {
+        expect(
+          await AMQPConnectionManager.publishChannelWrapper.checkQueue(
+            queue.queue + ".dlq",
+          ),
+        ).toBeDefined();
+      }
+    });
+
+    it("should invoke callback when publishing message", async () => {
+      const publishedMessage = { test: "test" };
+      const loggerSpy = jest.spyOn(Logger.prototype, "log");
+
+      await rabbitMqService.publish(
+        TestConsumers[0].exchangeName,
+        TestConsumers[0].routingKey,
+        publishedMessage,
+      );
+
+      await sleep();
+
+      expect(globalConsumerCallbackSpy).toHaveBeenCalledWith(
+        publishedMessage,
+        expect.objectContaining({
+          queue: TestConsumers[0].queue,
+        }),
+      );
+
+      expect(globalConsumerCallbackSpy.mock.calls[0][1].queue).toBeDefined();
+      expect(globalConsumerCallbackSpy.mock.calls[0][1].message).toBeDefined();
+      expect(globalConsumerCallbackSpy.mock.calls[0][1].channel).toBeDefined();
+
+      expect(loggerSpy).toHaveBeenCalled();
+      expect(JSON.parse(loggerSpy.mock.lastCall?.[0])).toMatchObject(
+        expect.objectContaining({
+          logLevel: "log",
+          title: `[AMQP] [CONSUMER] [${TestConsumers[0].exchangeName}] [${TestConsumers[0].routingKey}] [${TestConsumers[0].queue}]`,
+          binding: {
+            queue: TestConsumers[0].queue,
+            routingKey: TestConsumers[0].routingKey,
+            exchange: TestConsumers[0].exchangeName,
+          },
+        }),
+      );
+    });
+
+    it("should attempt retry if callback throws", async () => {
+      const publishedMessage = { test: "test" };
+      const loggerSpy = jest.spyOn(Logger.prototype, "error");
+
+      const retrySpy = jest.spyOn(
+        RabbitMQConsumer.prototype as any,
+        "processRetry",
+      );
+
+      await rabbitMqService.publish(
+        TestConsumers[1].exchangeName,
+        TestConsumers[1].routingKey,
+        publishedMessage,
+      );
+
+      await sleep();
+
+      expect(globalConsumerThrowSpy).toHaveBeenCalledWith(
+        publishedMessage,
+        expect.objectContaining({
+          queue: TestConsumers[1].queue,
+        }),
+      );
+
+      expect(retrySpy).toHaveBeenCalled();
+      expect(loggerSpy).toHaveBeenCalled();
+      expect(JSON.parse(loggerSpy.mock.lastCall?.[0])).toMatchObject(
+        expect.objectContaining({
+          logLevel: "error",
+          title: `[AMQP] [CONSUMER] [${TestConsumers[1].exchangeName}] [${TestConsumers[1].routingKey}] [${TestConsumers[1].queue}]`,
+          binding: {
+            queue: TestConsumers[1].queue,
+            routingKey: TestConsumers[1].routingKey,
+            exchange: TestConsumers[1].exchangeName,
+          },
+          error: "throw_test",
+        }),
+      );
     });
   });
 });

@@ -1,22 +1,16 @@
-import { Injectable } from "@nestjs/common";
-import {
-  IRabbitConsumer,
-  RabbitConsumerParameters,
-  RabbitMQService,
-} from "../../src";
+import { Injectable, Logger } from "@nestjs/common";
+import { IRabbitConsumer, RabbitMQService } from "../../src";
 
 @Injectable()
 export class RmqTestService implements IRabbitConsumer {
+  private logger = new Logger(RmqTestService.name);
   constructor(readonly rabbitService: RabbitMQService) {}
 
-  messageHandler(
-    content: any,
-    parameters?: RabbitConsumerParameters,
-  ): Promise<void> {
-    return null;
+  async messageHandler(content: any): Promise<void> {
+    console.log("Here is the message", content);
   }
 
-  testHandler2(content: any) {
-    return null;
+  async throwHandler(content: any) {
+    throw new Error("throw_test");
   }
 }

@@ -6,6 +6,7 @@ import {
   RabbitMQConsumerOptions,
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
+import { Logger } from "@nestjs/common";
 
 type InspectInput = {
   consumeMessage: ConsumeMessage;
@@ -15,11 +16,19 @@ type InspectInput = {
 };
 
 export class RabbitMQConsumer {
+  private logger = new Logger(RabbitMQConsumer.name);
+
   private readonly connection: AmqpConnectionManager;
   private readonly options: RabbitMQModuleOptions;
   private readonly delayExchange: string;
   private readonly publishChannel: ChannelWrapper;
   private readonly logType: LogType;
+  private defaultConsumerOptions: Partial<RabbitMQConsumerOptions> = {
+    autoAck: true,
+    durable: true,
+    prefetch: 10,
+    autoDelete: false,
+  };
 
   constructor(
     connection: AmqpConnectionManager,
@@ -28,28 +37,31 @@ export class RabbitMQConsumer {
   ) {
     this.connection = connection;
     this.options = options;
-    this.delayExchange = `${this.options.delayExchangeName}.delay.exchange`;
+    this.delayExchange = `${this.options.delayExchangeName}.delay`;
     this.publishChannel = publishChannelWrapper;
 
     this.logType =
       (process.env.RABBITMQ_TRAFFIC_TYPE as LogType) ??
-      this.options.trafficInspection ??
-      "none";
+      this.options.extraOptions.logType;
   }
 
   public async createConsumer(
     consumer: RabbitMQConsumerOptions,
     messageHandler: IRabbitHandler,
   ): Promise<ChannelWrapper> {
+    consumer = {
+      ...this.defaultConsumerOptions,
+      ...consumer,
+    };
     const consumerChannel = this.connection.createChannel({
       confirm: true,
       name: consumer.queue,
       setup: (channel: ConfirmChannel) => {
         return Promise.all([
-          channel.prefetch(consumer.prefetch ?? 10),
+          channel.prefetch(consumer.prefetch),
           channel.assertQueue(consumer.queue, {
-            durable: consumer.durable ?? true,
-            autoDelete: consumer.autoDelete ?? false,
+            durable: consumer.durable,
+            autoDelete: consumer.autoDelete,
             deadLetterRoutingKey: `${consumer.queue}${consumer.suffixOptions?.dlqSuffix ?? ".dlq"}`,
             deadLetterExchange: "",
           }),
@@ -92,22 +104,23 @@ export class RabbitMQConsumer {
         queue: consumer.queue,
       });
 
-      if (consumer.autoAck === undefined || consumer.autoAck) {
+      if (consumer.autoAck) {
         channel.ack(message);
       }
     } catch (e) {
       hasErrors = e;
       await this.processRetry(consumer, message, channel);
     } finally {
-      this.inspectConsumer({
-        binding: {
-          queue: consumer.queue,
-          routingKey: message.fields.routingKey ?? consumer.routingKey,
-          exchange: consumer.exchangeName,
-        },
-        consumeMessage: message,
-        error: hasErrors,
-      });
+      if (["consumer", "all"].includes(this.logType) || hasErrors)
+        this.inspectConsumer({
+          binding: {
+            queue: consumer.queue,
+            routingKey: message.fields.routingKey ?? consumer.routingKey,
+            exchange: consumer.exchangeName,
+          },
+          consumeMessage: message,
+          error: hasErrors,
+        });
     }
   }
 
@@ -172,7 +185,9 @@ export class RabbitMQConsumer {
             return;
           }
         } catch (e) {
-          console.log(JSON.stringify({ message: "could_not_retry", error: e }));
+          this.logger.error(
+            JSON.stringify({ message: "could_not_retry", error: e }),
+          );
           channel.nack(message);
         }
       }
@@ -182,15 +197,12 @@ export class RabbitMQConsumer {
   }
 
   private inspectConsumer(args: InspectInput): void {
-    if (!["consumer", "all"].includes(this.logType) && args?.error == undefined)
-      return;
-
     const { binding, consumeMessage, data, error } = args;
 
     const { exchange, routingKey, queue } = binding;
     const { content, fields, properties } = consumeMessage;
     const message = `[AMQP] [CONSUMER] [${exchange}] [${routingKey}] [${queue}]`;
-    const logLevel = error ? "error" : "info";
+    const logLevel = error ? "error" : "log";
 
     const logData = {
       logLevel,
@@ -200,15 +212,14 @@ export class RabbitMQConsumer {
       message: {
         fields,
         properties,
-        content: data ?? content.toString("utf8"),
+        content: data ?? JSON.parse(content.toString("utf8")),
       },
-      error,
     };
 
     if (error)
       Object.assign(logData, { error: error.message ?? error.toString() });
 
-    console[logLevel](JSON.stringify(logData));
+    this.logger[logLevel](JSON.stringify(logData));
 
     // this.logger[logLevel]({ message, amqp: logData });
   }
