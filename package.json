@@ -1,6 +1,6 @@
 {
   "name": "@bgaldino/nestjs-rabbitmq",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A different way of configuring your RabbitMQ",
   "main": "dist/index.js",
   "author": "Bruno Galdino <brunogaldinoc@gmail.com>",
@@ -14,7 +14,7 @@
   "license": "MIT",
   "types": "dist/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "NODE_ENV=develop node --expose-gc ./node_modules/jest/bin/jest.js --config ./test/jest.config.json --logHeapUsage --coverage",
     "build": "rimraf dist && tsc",
     "prepublish": "pnpm run build"
   },
@@ -29,12 +29,16 @@
     "@nestjs/common": ">9"
   },
   "devDependencies": {
-    "@nestjs/common": "^10.3.1",
+    "@nestjs/common": "^10.4.0",
+    "@nestjs/testing": "^10.4.0",
     "@types/amqplib": "^0.10.5",
-    "@types/node": "^20.11.16",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^22.2.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.4",
     "typescript": "^5.3.3"
   },
   "files": [

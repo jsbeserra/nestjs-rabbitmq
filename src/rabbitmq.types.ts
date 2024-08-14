@@ -51,14 +51,8 @@ export type RabbitMQConsumerOptions = {
 
   /** Override default suffix that are defined in this library */
   suffixOptions?: {
-    exchangeSuffix?: string;
     dlqSuffix?: string;
   };
-};
-
-export type RabbitConnectionOptions = {
-  urls: string | string[];
-  // appName: string;
 };
 
 export type RabbitMQAssertExchange = {
@@ -82,10 +76,6 @@ export type RabbitMQAssertExchange = {
      * Default: false */
     autoDelete?: boolean;
 
-    /** Override default suffix that are defined in this library.
-     * Default: '.exchange'*/
-    exchangeSufix?: string;
-
     /** Declare the exchange as a delayed one, in this scenario the exchange will be declated as a `x-delayed-message` with an argument `x-delayed-type: ${type}`
      * Default: false */
     isDelayed?: boolean;
@@ -107,34 +97,44 @@ export type RabbitMQModuleOptions = {
    * E.g: amqp://{user}:{password}@{url}/{vhost} */
   connectionString: string | string[];
 
-  /** The name of the squad you belong */
+  /** The name of the centralized retry exchange that will be used
+   * a `.delay` will be added to the given name
+   * Will be asserted if it does not exists*/
   delayExchangeName: string;
 
-  /** When **TRUE** the SDK will not initiate the consumers automatically during the _OnModuleInit_
-   * To initiate the consumer, you can call it at the end of the `bootstrap()` on your `main.ts` file
-   * ```javascript
-   * const rabbitService: RabbitMQService = app.get(RabbitMQService);
-   * await rabbitService.beginConsumers();
-   * ```
-   * Default: false */
-  consumerManualLoad?: boolean;
-
-  /** When **TRUE**, the connection will be made synchronously during the `OnModuleInit` lifecycle
-   * and will only return after the connection is sucessfully made
-   * When **FALSE**, the connection is made asynchronously and will release the lifecycle event as fast as possible.
-   * Default: true */
-  waitConnection?: boolean;
+  // /** When **TRUE**, the connection will be made synchronously during the `OnModuleInit` lifecycle
+  //  * and will only return after the connection is sucessfully made
+  //  * When **FALSE**, the connection is made asynchronously and will release the lifecycle event as fast as possible.
+  //  * Default: true */
+  // waitConnection?: boolean;
 
   /** All exchanges declared here will be validated before attaching the consumers
    * If any of the exchanegs declared can not be asserted an error will be thrown */
   assertExchanges?: Array<RabbitMQAssertExchange>;
 
-  /** Enables the message inspection of different parts of the RabbitMQ
-   * this option can be overriden by using the env RABBITMQ_TRAFFIC_TYPE */
-  trafficInspection?: LogType;
-
   /** Array of consumers that will be attached to the application*/
   consumerChannels?: Array<RabbitMQConsumerChannel>;
+
+  extraOptions?: {
+    /** When **`sync`**, the connection will be made synchronously during the `OnModuleInit` lifecycle
+     * and will only return after the connection is sucessfully made
+     * When **`async`**, the connection is made asynchronously and will release the lifecycle event as fast as possible.
+     * Default: `sync` */
+    connectionType?: "sync" | "async";
+
+    /** When **TRUE** the SDK will not initiate the consumers automatically during the _OnModuleInit_
+     * To initiate the consumer, you can call it at the end of the `bootstrap()` on your `main.ts` file
+     * ```javascript
+     * const rabbitService: RabbitMQService = app.get(RabbitMQService);
+     * await rabbitService.beginConsumers();
+     * ```
+     * Default: false */
+    consumerManualLoad?: boolean;
+
+    /** Enables the message inspection of different parts of the RabbitMQ
+     * this option can be overriden by using the env RABBITMQ_LOG_TYPE */
+    logType?: LogType;
+  };
 };
 
 export type PublishOptions = {

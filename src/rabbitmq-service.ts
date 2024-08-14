@@ -1,30 +1,12 @@
-import { Logger, OnApplicationBootstrap } from "@nestjs/common";
+import { Logger } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { AMQPConnectionManager } from "./amqp-connection-manager";
 import { PublishOptions } from "./rabbitmq.types";
 import { RabbitMQConsumer } from "./rabbitmq-consumers";
+import { ChannelWrapper } from "amqp-connection-manager";
 
-export class RabbitMQService implements OnApplicationBootstrap {
+export class RabbitMQService {
   private logger = new Logger(RabbitMQService.name);
-
-  private connectionBlocked: { isBlocked: boolean; reason: string } = {
-    isBlocked: false,
-    reason: "",
-  };
-
-  async onApplicationBootstrap() {
-    AMQPConnectionManager.connection.on("blocked", ({ reason }) => {
-      console.error(`RabbitMQ broker is blocked with reason: ${reason}`);
-      this.connectionBlocked = { isBlocked: true, reason };
-    });
-
-    AMQPConnectionManager.connection.on("unblocked", () => {
-      console.error(
-        `RabbitMQ broker connection is unblocked, last reason was: ${this.connectionBlocked?.reason}`,
-      );
-      this.connectionBlocked = { isBlocked: false, reason: "" };
-    });
-  }
 
   /**
    * Check status of the main conenection to the broker.
@@ -53,21 +35,16 @@ export class RabbitMQService implements OnApplicationBootstrap {
     let hasErrors = null;
 
     try {
-      if (AMQPConnectionManager.connection) {
-        await this.waitForBlockedConnection();
-        return AMQPConnectionManager.publishChannelWrapper.publish(
-          exchangeName,
-          routingKey,
-          JSON.stringify(message),
-          {
-            correlationId: randomUUID(),
-            ...options,
-            headers: { "x-delay": 0, ...options?.headers },
-          },
-        );
-      } else {
-        throw new Error("Connection with RabbitMQ is closed. Cannot publish");
-      }
+      await AMQPConnectionManager.publishChannelWrapper.publish(
+        exchangeName,
+        routingKey,
+        JSON.stringify(message),
+        {
+          correlationId: randomUUID(),
+          ...options,
+          headers: { "x-delay": 0, ...options?.headers },
+        },
+      );
     } catch (e) {
       hasErrors = e;
     } finally {
@@ -83,43 +60,32 @@ export class RabbitMQService implements OnApplicationBootstrap {
     return !hasErrors;
   }
 
-  async createConsumers() {
-    if (AMQPConnectionManager.isConsumersLoaded) {
+  async createConsumers(): Promise<ChannelWrapper[]> {
+    if (AMQPConnectionManager.isConsumersLoaded)
       throw new Error(
-        "Consumers already initialized. If you want to initiate the consumers manually please set consumerManualLoad: true",
+        "Consumers already initialized. If you wish to start it manually, see consumeManualLoad",
       );
+
+    const consumerOptionList =
+      AMQPConnectionManager.rabbitModuleOptions.consumerChannels ?? [];
+
+    const consumerList = [];
+
+    for (const consumerEntry of consumerOptionList) {
+      const consumerOptions = consumerEntry.options;
+
+      const consumer = await new RabbitMQConsumer(
+        AMQPConnectionManager.connection,
+        AMQPConnectionManager.rabbitModuleOptions,
+        AMQPConnectionManager.publishChannelWrapper,
+      ).createConsumer(consumerOptions, consumerEntry.messageHandler);
+
+      consumerList.push(consumer);
     }
 
-    const consumerInstance = new RabbitMQConsumer(
-      AMQPConnectionManager.connection,
-      AMQPConnectionManager.rabbitModuleOptions,
-      AMQPConnectionManager.publishChannelWrapper,
-    );
-    await consumerInstance.createConsumers();
     this.logger.debug("Initiating RabbitMQ consumers manually");
-  }
-
-  private async waitForBlockedConnection(): Promise<void> {
-    let retry = 0;
-
-    while (this.connectionBlocked.isBlocked && retry <= 60) {
-      console.warn(
-        "RabbitMQ connection is blocked, waiting 1s before trying again",
-      );
-      retry++;
-
-      await new Promise<void>((resolve) =>
-        setTimeout(() => {
-          resolve();
-        }, 1000),
-      );
-    }
-
-    if (retry >= 60) {
-      throw new Error(
-        `RabbitMQ connection is still blocked, cannot publish message. Reason: ${this.connectionBlocked?.reason}`,
-      );
-    }
+    AMQPConnectionManager.isConsumersLoaded = true;
+    return consumerList;
   }
 
   private inspectPublisher(
@@ -129,34 +95,27 @@ export class RabbitMQService implements OnApplicationBootstrap {
     properties?: PublishOptions,
     error?: any,
   ): void {
-    // if (
-    //   !["publisher", "all"].includes(
-    //     this.rabbitModuleOptions.trafficInspection,
-    //   ) &&
-    //   !error
-    // )
-    //   return;
+    if (
+      !["publisher", "all"].includes(
+        AMQPConnectionManager.rabbitModuleOptions.extraOptions.logType,
+      ) &&
+      !error
+    )
+      return;
 
-    const logLevel = error ? "error" : "info";
-    const message = `[AMQP] [PUBLISH] [${exchange}] [${routingKey}]`;
+    const logLevel = error ? "error" : "log";
     const logData = {
       logLevel,
       correlationId: properties?.correlationId,
-      title: message,
+      title: `[AMQP] [PUBLISH] [${exchange}] [${routingKey}]`,
       binding: { exchange, routingKey },
       message: { content, properties },
     };
 
-    if (error)
+    if (error) {
       Object.assign(logData, { error: error.message ?? error.toString() });
+    }
 
-    console[logLevel](JSON.stringify(logData));
-
-    // this.logger[logLevel]({
-    //   log
-    //   message,
-    //   amqp: logData,
-    //   error,
-    // });
+    this.logger[logLevel](JSON.stringify(logData));
   }
 }

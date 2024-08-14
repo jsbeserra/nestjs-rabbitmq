@@ -11,7 +11,6 @@ export {
   RabbitMQModuleOptions,
   RabbitMQAssertExchange,
   RabbitMQConsumerOptions,
-  RabbitConnectionOptions,
   RabbitMQConsumerChannel,
   PublishOptions,
 } from "./rabbitmq.types";

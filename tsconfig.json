@@ -9,9 +9,9 @@
     "target": "es2017",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
+    "baseUrl": ".",
     "incremental": true,
     "esModuleInterop": true
   },
-  "exclude": ["node_modules", "examples"]
+  "exclude": ["node_modules", "examples", "test"]
 }
