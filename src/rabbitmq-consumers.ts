@@ -220,7 +220,5 @@ export class RabbitMQConsumer {
       Object.assign(logData, { error: error.message ?? error.toString() });
 
     this.logger[logLevel](JSON.stringify(logData));
-
-    // this.logger[logLevel]({ message, amqp: logData });
   }
 }

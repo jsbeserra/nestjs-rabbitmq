@@ -4,10 +4,10 @@ import {
   RmqTestConfig,
   TestConsumers,
   TestExchanges,
-} from "./mocks/configs/rmq-test.config";
-import { RmqTestModule } from "./mocks/rmq-test.module";
+} from "./fixtures/configs/rmq-test.config";
+import { RmqTestModule } from "./fixtures/rmq-test.module";
 import { RabbitMQModule } from "../src/rabbitmq.module";
-import { RmqTestService } from "./mocks/rmq-test.service";
+import { RmqTestService } from "./fixtures/rmq-test.service";
 import { RabbitMQService } from "../src/rabbitmq-service";
 import { AMQPConnectionManager } from "../src/amqp-connection-manager";
 import { once } from "events";
@@ -211,7 +211,7 @@ describe("AMQPConnectionManager", () => {
       );
     });
 
-    it("should attempt retry if callback throws", async () => {
+    it("should attempt retry if callback throws, log it", async () => {
       const publishedMessage = { test: "test" };
       const loggerSpy = jest.spyOn(Logger.prototype, "error");
 

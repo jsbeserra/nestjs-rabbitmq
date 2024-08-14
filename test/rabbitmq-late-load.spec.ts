@@ -1,10 +1,12 @@
 import { TestingModule, Test } from "@nestjs/testing";
 import { RabbitMQService, RabbitMQModule } from "../src";
 import { AMQPConnectionManager } from "../src/amqp-connection-manager";
-import { RmqTestManualConsumerConfig } from "./mocks/configs/rmq-test-manual-consumer.config";
-import { RmqTestModule } from "./mocks/rmq-test.module";
+import { RmqTestManualConsumerConfig } from "./fixtures/configs/rmq-test-manual-consumer.config";
+import { RmqTestModule } from "./fixtures/rmq-test.module";
 import { RabbitMQConsumer } from "../src/rabbitmq-consumers";
-import { TestConsumers } from "./mocks/configs/rmq-test.config";
+import { TestConsumers } from "./fixtures/configs/rmq-test.config";
+import { Logger } from "@nestjs/common";
+import { RmqTestService } from "./fixtures/rmq-test.service";
 
 describe("AMQPConnectionManager Late Loading", () => {
   let rabbitMqService: RabbitMQService;
@@ -55,5 +57,26 @@ describe("AMQPConnectionManager Late Loading", () => {
     expect(consumerSpy).toHaveBeenCalled();
     expect(createSpy).toHaveBeenCalledTimes(1);
     expect(createSpy.mock.calls[0][0]).toMatchObject(TestConsumers[0]);
+  });
+
+  it("should publish and not log message", async () => {
+    jest.clearAllMocks();
+
+    const spy = jest.spyOn(RabbitMQService.prototype, "publish");
+    const loggerSpy = jest.spyOn(Logger.prototype, "log");
+    jest
+      .spyOn(RmqTestService.prototype, "messageHandler")
+      .mockImplementation(async () => {});
+
+    const isPublished = await rabbitMqService.publish(
+      TestConsumers[0].exchangeName,
+      TestConsumers[0].routingKey,
+      { test: "published" },
+    );
+
+    expect(spy).toHaveBeenCalled();
+    expect(isPublished).toBeTruthy();
+
+    expect(loggerSpy).not.toHaveBeenCalled();
   });
 });

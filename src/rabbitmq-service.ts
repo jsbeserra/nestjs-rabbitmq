@@ -35,20 +35,16 @@ export class RabbitMQService {
     let hasErrors = null;
 
     try {
-      try {
-        await AMQPConnectionManager.publishChannelWrapper.publish(
-          exchangeName,
-          routingKey,
-          JSON.stringify(message),
-          {
-            correlationId: randomUUID(),
-            ...options,
-            headers: { "x-delay": 0, ...options?.headers },
-          },
-        );
-      } catch (e) {
-        hasErrors = e;
-      }
+      await AMQPConnectionManager.publishChannelWrapper.publish(
+        exchangeName,
+        routingKey,
+        JSON.stringify(message),
+        {
+          correlationId: randomUUID(),
+          ...options,
+          headers: { "x-delay": 0, ...options?.headers },
+        },
+      );
     } catch (e) {
       hasErrors = e;
     } finally {

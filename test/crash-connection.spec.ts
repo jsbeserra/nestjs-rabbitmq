@@ -1,15 +1,14 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { RabbitMQModule, RabbitMQService } from "../src";
 import { AMQPConnectionManager } from "../src/amqp-connection-manager";
-import { RmqTestConfig } from "./mocks/configs/rmq-test.config";
-import { RmqTestModule } from "./mocks/rmq-test.module";
-import { RmqTestService } from "./mocks/rmq-test.service";
+import { RmqTestConfig } from "./fixtures/configs/rmq-test.config";
+import { RmqTestModule } from "./fixtures/rmq-test.module";
+import { RmqTestService } from "./fixtures/rmq-test.service";
 import { Logger } from "@nestjs/common";
 
 describe("CrashedConnection", () => {
   let rabbitMqService: RabbitMQService;
   let amqpManager: AMQPConnectionManager;
-  let testService: RmqTestService;
   let moduleRef: TestingModule;
 
   beforeAll(async () => {
@@ -28,7 +27,6 @@ describe("CrashedConnection", () => {
 
     amqpManager = moduleRef.get(AMQPConnectionManager);
     rabbitMqService = moduleRef.get(RabbitMQService);
-    testService = moduleRef.get(RmqTestService);
 
     await AMQPConnectionManager.publishChannelWrapper.waitForConnect();
 
@@ -46,6 +44,8 @@ describe("CrashedConnection", () => {
   });
 
   it("should throw a message if exchange does not exists and log it", async () => {
+    jest.clearAllMocks();
+
     const spy = jest.spyOn(RabbitMQService.prototype, "publish");
     const logSpy = jest.spyOn(Logger.prototype, "error");
     jest.spyOn(RmqTestService.prototype, "messageHandler").mockImplementation();

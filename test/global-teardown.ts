@@ -3,7 +3,7 @@ import {
   delayExchangeName,
   TestConsumers,
   TestExchanges,
-} from "./mocks/configs/rmq-test.config";
+} from "./fixtures/configs/rmq-test.config";
 
 export default async function (globalConfig, projectConfig) {
   const connection = connect("amqp://localhost:5672", {
