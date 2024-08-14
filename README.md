@@ -7,6 +7,7 @@
 - [@bgaldino/nestjs-rabbitmq](#bgaldinonestjs-rabbitmq)
 - [Table of Contents](#table-of-contents)
   - [Description](#description)
+  - [Motivation](#motivation)
     - [Requirements](#requirements)
     - [Instalation](#instalation)
   - [Getting Started](#getting-started)
@@ -17,11 +18,13 @@
   - [Consumers](#consumers)
     - [The messageHandler callback](#the-messagehandler-callback)
     - [Strongly typed consumer](#strongly-typed-consumer)
-    - [Consumer late loading](#consumer-late-loading)
     - [Declaration example](#declaration-example)
   - [Retrying strategy](#retrying-strategy)
   - [Disabling the automatic ack](#disabling-the-automatic-ack)
-  - [Message inspection and logging](#message-inspection-and-logging)
+  - [Extra options](#extra-options)
+    - [Consumer manual loading](#consumer-manual-loading)
+    - [Message inspection and logging](#message-inspection-and-logging)
+    - [Detach connection from NestJS lifecycle](#detach-connection-from-nestjs-lifecycle)
   - [How to build this library locally ?](#how-to-build-this-library-locally)
   - [Planned features](#planned-features)
   - [Contribute](#contribute)
@@ -33,6 +36,14 @@
 This module features an opinionated way of configuring the RabbitMQ connection
 by using a configuration file that describes the behaviour of all publishers
 and consumers present in your project
+
+## Motivation
+
+I wanted to have a central place where its easier to open the project and see
+the declared behaviour of the RabbitMQ instance for that project, without having
+to look around for NestJS annotations, microservices or whatever. Simply to open,
+go to the configuration file and know exactly what I'm looking at and what I should
+expect.
 
 ### Requirements
 
@@ -264,30 +275,6 @@ export class MyClass implements IRabbitConsumer<MyInterface> {
 }
 ```
 
-### Consumer manual loading
-
-This library attaches the consumers during the `OnApplicationBootstrap` lifecycle
-of the NestJS Application, meaning that the application will begin to receive
-messages as soon as the lifecycle is done.
-
-If your application needs some time to initiate the consumers for some reason,
-(pods with limited resource for example), you can set the flag
-`extraOptions.consumerManualLoad: true` on the configuration file and manually
-call the consumer instantiation.
-
-**Example:**
-
-```typescript
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(3000);
-
-  const rabbit: RabbitMQService = app.get(RabbitMQService);
-  await rabbit.createConsumers();
-}
-bootstrap();
-```
-
 ### Declaration example
 
 **Service example:**
@@ -394,13 +381,47 @@ public async messageHandler(content: any, params: RabbitConsumerParameters): Pro
 }
 ```
 
-## Message inspection and logging
+## Extra options
+
+### Consumer manual loading
+
+This library attaches the consumers during the `OnApplicationBootstrap` lifecycle
+of the NestJS Application, meaning that the application will begin to receive
+messages as soon as the lifecycle is done.
+
+If your application needs some time to initiate the consumers for some reason,
+(pods with limited resource for example), you can set the flag
+`extraOptions.consumerManualLoad: true` on the configuration file and manually
+call the consumer instantiation.
+
+**Example:**
+
+```typescript
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  await app.listen(3000);
+
+  const rabbit: RabbitMQService = app.get(RabbitMQService);
+  await rabbit.createConsumers();
+}
+bootstrap();
+```
+
+### Message inspection and logging
 
 You can inspect the consumer/publisher messages by setting the parameter
 `extraOptions.logType` or setting the environment variable `RABBITMQ_LOG_TYPE`
 to either: `all | consumer | publisher | none`.
 
 The default value is `none`
+
+### Detach connection from NestJS lifecycle
+
+By passing the flag `extraOptions.connectionType = 'async'` the library will not
+wait for the connection to be done before releasing the `onModuleInit` lifecycle.
+
+This can be useful if your application does not depend on the AMQP connection
+and is used as a backup or something not central, for example.
 
 ## How to build this library locally ?
 
@@ -415,7 +436,7 @@ And should be good to go
 
 ## Planned features
 
-- [ ] Cover everything in tests
+- [x] Add tests
 - [ ] Improve semantics of the config file
 - [ ] Offer a retry mechanism without the `x-delay`
 - [ ] Make the publisher method strongly typed based on the `assertExchanges`
