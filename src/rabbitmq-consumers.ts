@@ -16,7 +16,7 @@ type InspectInput = {
 };
 
 export class RabbitMQConsumer {
-  private logger = new Logger(RabbitMQConsumer.name);
+  private logger: Console | Logger;
 
   private readonly connection: AmqpConnectionManager;
   private readonly options: RabbitMQModuleOptions;
@@ -43,6 +43,10 @@ export class RabbitMQConsumer {
     this.logType =
       (process.env.RABBITMQ_LOG_TYPE as LogType) ??
       this.options.extraOptions.logType;
+
+    this.logger =
+      options?.extraOptions?.loggerInstance ??
+      new Logger(RabbitMQConsumer.name);
   }
 
   public async createConsumer(

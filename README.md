@@ -415,6 +415,10 @@ to either: `all | consumer | publisher | none`.
 
 The default value is `none`
 
+You can also use the `extraOptions.loggerInstance` to pass your custom Logger
+as long as it follows the Logger/Console interfaces. The SDK will use the given
+instance to log any messages
+
 ### Detach connection from NestJS lifecycle
 
 By passing the flag `extraOptions.connectionType = 'async'` the library will not

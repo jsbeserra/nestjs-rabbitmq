@@ -6,7 +6,9 @@ import { RabbitMQConsumer } from "./rabbitmq-consumers";
 import { ChannelWrapper } from "amqp-connection-manager";
 
 export class RabbitMQService {
-  private logger = new Logger(RabbitMQService.name);
+  private logger: Console | Logger =
+    AMQPConnectionManager.rabbitModuleOptions?.extraOptions?.loggerInstance ??
+    new Logger(RabbitMQService.name);
 
   /**
    * Check status of the main conenection to the broker.

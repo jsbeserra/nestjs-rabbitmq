@@ -21,7 +21,8 @@ import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
 export class AMQPConnectionManager
   implements OnModuleInit, OnApplicationBootstrap, OnApplicationShutdown
 {
-  private readonly logger: Logger = new Logger(AMQPConnectionManager.name);
+  // private readonly logger: Logger = new Logger(AMQPConnectionManager.name);
+  private readonly logger: Console | Logger;
   private rabbitTerminalErrors: string[] = [
     "channel-error",
     "precondition-failed",
@@ -45,6 +46,9 @@ export class AMQPConnectionManager
   private connectionBlockedReason: string;
 
   constructor(@Inject("RABBIT_OPTIONS") options: RabbitOptionsFactory) {
+    this.logger =
+      options.createRabbitOptions()?.extraOptions?.loggerInstance ??
+      new Logger(AMQPConnectionManager.name);
     AMQPConnectionManager.rabbitModuleOptions = {
       ...this.defaultOptions,
       ...options.createRabbitOptions(),

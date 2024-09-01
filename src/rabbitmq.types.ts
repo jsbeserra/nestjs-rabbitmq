@@ -136,6 +136,13 @@ export type RabbitMQModuleOptions = {
     /** Enables the message inspection of different parts of the RabbitMQ
      * this option can be overriden by using the env RABBITMQ_LOG_TYPE */
     logType?: LogType;
+
+    /**
+     * Will use the given logger instead of the default Logger from NestJS. Ensure that the logger follows the
+     * NestJS Logger or Console interfaces to be used
+     *Default: new Logger()
+     */
+    loggerInstance?: Console | Logger;
   };
 };
 
