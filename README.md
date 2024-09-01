@@ -229,9 +229,11 @@ createRabbitOptions(): RabbitMQModuleOptions {
 ```
 
 The consumer **DOES NOT** create exchanges and only bind to ones that already
-exists. This is to avoid creating exchanges with typos and misconfigurations.
+exists. This is to avoid creating exchanges with typos and
+misconfigurations.
 
-You can also declare an array of `routingKeys: string[]` if you want to attach multiple keys to the same queue/callback
+You can also declare an array of `routingKeys: string[]` if you want to attach
+multiple keys to the same queue/callback
 
 ### The messageHandler callback
 
