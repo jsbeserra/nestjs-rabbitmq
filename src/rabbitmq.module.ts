@@ -13,7 +13,7 @@ export class RabbitMQModule {
   static register(options: RabbitOptions): DynamicModule {
     return {
       module: RabbitMQModule,
-      imports: [...(options?.injects ?? [])],
+      imports: options?.injects ?? [],
       global: true,
       providers: [
         AMQPConnectionManager,

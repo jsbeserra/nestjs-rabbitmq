@@ -229,7 +229,11 @@ createRabbitOptions(): RabbitMQModuleOptions {
 ```
 
 The consumer **DOES NOT** create exchanges and only bind to ones that already
-exists. This is to avoid creating exchanges with typos and misconfigurations.
+exists. This is to avoid creating exchanges with typos and
+misconfigurations.
+
+You can also declare an array of `routingKeys: string[]` if you want to attach
+multiple keys to the same queue/callback
 
 ### The messageHandler callback
 
@@ -414,6 +418,10 @@ You can inspect the consumer/publisher messages by setting the parameter
 to either: `all | consumer | publisher | none`.
 
 The default value is `none`
+
+You can also use the `extraOptions.loggerInstance` to pass your custom Logger
+as long as it follows the Logger/Console interfaces. The SDK will use the given
+instance to log any messages
 
 ### Detach connection from NestJS lifecycle
 

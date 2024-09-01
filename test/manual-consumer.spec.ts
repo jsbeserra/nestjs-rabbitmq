@@ -70,7 +70,7 @@ describe("AMQPConnectionManager Late Loading", () => {
 
     const isPublished = await rabbitMqService.publish(
       TestConsumers[0].exchangeName,
-      TestConsumers[0].routingKey,
+      TestConsumers[0].routingKey as string,
       { test: "published" },
     );
 

@@ -16,7 +16,7 @@ type InspectInput = {
 };
 
 export class RabbitMQConsumer {
-  private logger = new Logger(RabbitMQConsumer.name);
+  private logger: Console | Logger;
 
   private readonly connection: AmqpConnectionManager;
   private readonly options: RabbitMQModuleOptions;
@@ -41,8 +41,12 @@ export class RabbitMQConsumer {
     this.publishChannel = publishChannelWrapper;
 
     this.logType =
-      (process.env.RABBITMQ_TRAFFIC_TYPE as LogType) ??
+      (process.env.RABBITMQ_LOG_TYPE as LogType) ??
       this.options.extraOptions.logType;
+
+    this.logger =
+      options?.extraOptions?.loggerInstance ??
+      new Logger(RabbitMQConsumer.name);
   }
 
   public async createConsumer(
@@ -53,6 +57,7 @@ export class RabbitMQConsumer {
       ...this.defaultConsumerOptions,
       ...consumer,
     };
+
     const consumerChannel = this.connection.createChannel({
       confirm: true,
       name: consumer.queue,
@@ -66,11 +71,21 @@ export class RabbitMQConsumer {
             deadLetterExchange: "",
           }),
 
-          channel.bindQueue(
-            consumer.queue,
-            consumer.exchangeName,
-            consumer.routingKey,
-          ),
+          new Promise((resolve) => {
+            if (typeof consumer.routingKey === "object") {
+              for (const rk of consumer.routingKey) {
+                channel.bindQueue(consumer.queue, consumer.exchangeName, rk);
+              }
+            } else {
+              channel.bindQueue(
+                consumer.queue,
+                consumer.exchangeName,
+                consumer.routingKey,
+              );
+            }
+
+            resolve(true);
+          }),
 
           this.attachRetryAndDLQ(channel, consumer),
 
@@ -115,7 +130,7 @@ export class RabbitMQConsumer {
         this.inspectConsumer({
           binding: {
             queue: consumer.queue,
-            routingKey: message.fields.routingKey ?? consumer.routingKey,
+            routingKey: message.fields.routingKey,
             exchange: consumer.exchangeName,
           },
           consumeMessage: message,
