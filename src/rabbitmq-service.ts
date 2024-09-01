@@ -44,7 +44,6 @@ export class RabbitMQService {
         {
           correlationId: randomUUID(),
           ...options,
-          headers: { "x-delay": 0, ...options?.headers },
         },
       );
     } catch (e) {

@@ -86,7 +86,7 @@ describe("AMQPConnectionManager", () => {
   });
 
   describe("Publisher", () => {
-    it("should have publisher channel connected", async () => {
+    it("should have a publisher channel connected", async () => {
       expect(AMQPConnectionManager.publishChannelWrapper).toBeDefined();
       expect(
         once(AMQPConnectionManager.publishChannelWrapper, "connect"),
@@ -103,10 +103,14 @@ describe("AMQPConnectionManager", () => {
       }
     });
 
-    it("should publish a message to a declared exchange and log it", async () => {
+    it("should publish a message to a declared exchange and log it with custom headers", async () => {
       jest.clearAllMocks();
 
       const spy = jest.spyOn(RabbitMQService.prototype, "publish");
+      const rabbitPublish = jest.spyOn(
+        AMQPConnectionManager.publishChannelWrapper,
+        "publish",
+      );
       const loggerSpy = jest.spyOn(Logger.prototype, "log");
       jest
         .spyOn(RmqTestService.prototype, "messageHandler")
@@ -116,12 +120,20 @@ describe("AMQPConnectionManager", () => {
         TestConsumers[0].exchangeName,
         TestConsumers[0].routingKey as string,
         { test: "published" },
+        { correlationId: "123" },
       );
 
       expect(spy).toHaveBeenCalled();
+
+      expect(rabbitPublish).toHaveBeenCalledWith(
+        TestConsumers[0].exchangeName,
+        TestConsumers[0].queue,
+        JSON.stringify({ test: "published" }),
+        { correlationId: "123" },
+      );
+
       expect(isPublished).toBeTruthy();
 
-      expect(loggerSpy).toHaveBeenCalled();
       expect(JSON.parse(loggerSpy.mock.lastCall?.[0])).toMatchObject(
         expect.objectContaining({
           logLevel: "log",
@@ -130,8 +142,10 @@ describe("AMQPConnectionManager", () => {
             routingKey: TestConsumers[0].routingKey,
             exchange: TestConsumers[0].exchangeName,
           },
+          correlationId: "123",
           message: {
             content: { test: "published" },
+            properties: { correlationId: "123" },
           },
         }),
       );
