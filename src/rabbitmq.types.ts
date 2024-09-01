@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { IDelayProgression, IRabbitHandler } from "./rabbitmq.interfaces";
 
 export type RabbitMQExchangeTypes = "direct" | "topic" | "fanout" | "headers";
@@ -30,11 +31,12 @@ export type RabbitMQConsumerOptions = {
   exchangeName: string;
 
   /** Routing key between the Queue and the exchange. This acts as a filter so only this routing key will be received by the queue.
+   * The parameter accepts an array of routing keys and each entry will be declared.
    * For exchanges of the type `fanout` this parameter will be ignored
    * This parameter accepts patterns
    *   E.g: webhook.`#` - Routes all messages that contains at least `webhook` in the routing key. (webhooks, webhooks.test)
    *        webhook.\*.test - Routes all messages that contains the described patter (webhook.ABC.test, webhook.123.test) */
-  routingKey: string;
+  routingKey: string | string[];
 
   /** When the consumer throwns an error. The message will be automatically enqueued to a retry queue. Here you declare the strategies for retrying */
   retryStrategy?: {

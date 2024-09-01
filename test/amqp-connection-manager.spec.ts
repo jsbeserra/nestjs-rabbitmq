@@ -114,7 +114,7 @@ describe("AMQPConnectionManager", () => {
 
       const isPublished = await rabbitMqService.publish(
         TestConsumers[0].exchangeName,
-        TestConsumers[0].routingKey,
+        TestConsumers[0].routingKey as string,
         { test: "published" },
       );
 
@@ -180,7 +180,7 @@ describe("AMQPConnectionManager", () => {
 
       await rabbitMqService.publish(
         TestConsumers[0].exchangeName,
-        TestConsumers[0].routingKey,
+        TestConsumers[0].routingKey as string,
         publishedMessage,
       );
 
@@ -222,7 +222,7 @@ describe("AMQPConnectionManager", () => {
 
       await rabbitMqService.publish(
         TestConsumers[1].exchangeName,
-        TestConsumers[1].routingKey,
+        TestConsumers[1].routingKey as string,
         publishedMessage,
       );
 

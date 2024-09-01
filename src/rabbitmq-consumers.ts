@@ -53,6 +53,7 @@ export class RabbitMQConsumer {
       ...this.defaultConsumerOptions,
       ...consumer,
     };
+
     const consumerChannel = this.connection.createChannel({
       confirm: true,
       name: consumer.queue,
@@ -66,11 +67,21 @@ export class RabbitMQConsumer {
             deadLetterExchange: "",
           }),
 
-          channel.bindQueue(
-            consumer.queue,
-            consumer.exchangeName,
-            consumer.routingKey,
-          ),
+          new Promise((resolve) => {
+            if (typeof consumer.routingKey === "object") {
+              for (const rk of consumer.routingKey) {
+                channel.bindQueue(consumer.queue, consumer.exchangeName, rk);
+              }
+            } else {
+              channel.bindQueue(
+                consumer.queue,
+                consumer.exchangeName,
+                consumer.routingKey,
+              );
+            }
+
+            resolve(true);
+          }),
 
           this.attachRetryAndDLQ(channel, consumer),
 
@@ -115,7 +126,7 @@ export class RabbitMQConsumer {
         this.inspectConsumer({
           binding: {
             queue: consumer.queue,
-            routingKey: message.fields.routingKey ?? consumer.routingKey,
+            routingKey: message.fields.routingKey,
             exchange: consumer.exchangeName,
           },
           consumeMessage: message,
