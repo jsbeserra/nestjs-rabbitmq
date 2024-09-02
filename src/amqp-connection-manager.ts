@@ -166,10 +166,10 @@ export class AMQPConnectionManager
         publishTimeout: 60000,
       });
 
-    await AMQPConnectionManager.publishChannelWrapper.addSetup(
-      async (channel: ConfirmChannel) => {
-        for (const publisher of AMQPConnectionManager.rabbitModuleOptions
-          ?.assertExchanges ?? []) {
+    for (const publisher of AMQPConnectionManager.rabbitModuleOptions
+      ?.assertExchanges ?? []) {
+      await AMQPConnectionManager.publishChannelWrapper.addSetup(
+        async (channel: ConfirmChannel) => {
           const isDelayed = publisher.options?.isDelayed ?? false;
           const type = isDelayed ? "x-delayed-message" : publisher.type;
           const argument = isDelayed
@@ -181,9 +181,9 @@ export class AMQPConnectionManager
             autoDelete: publisher?.options?.autoDelete ?? false,
             ...argument,
           });
-        }
-      },
-    );
+        },
+      );
+    }
   }
 
   private async createConsumers(): Promise<void> {
