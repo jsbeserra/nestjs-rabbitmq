@@ -118,12 +118,6 @@ export type RabbitMQModuleOptions = {
   consumerChannels?: Array<RabbitMQConsumerChannel>;
 
   extraOptions?: {
-    /** When **`sync`**, the connection will be made synchronously during the `OnModuleInit` lifecycle
-     * and will only return after the connection is sucessfully made
-     * When **`async`**, the connection is made asynchronously and will release the lifecycle event as fast as possible.
-     * Default: `sync` */
-    connectionType?: "sync" | "async";
-
     /** When **TRUE** the SDK will not initiate the consumers automatically during the _OnModuleInit_
      * To initiate the consumer, you can call it at the end of the `bootstrap()` on your `main.ts` file
      * ```javascript

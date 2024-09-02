@@ -16,7 +16,6 @@ export class RmqTestManualConsumerConfig implements RabbitOptionsFactory {
       extraOptions: {
         consumerManualLoad: true,
         logType: "none",
-        connectionType: "async",
       },
       assertExchanges: [{ name: "test_direct.exchange", type: "direct" }],
       consumerChannels: [
