@@ -24,7 +24,6 @@
   - [Extra options](#extra-options)
     - [Consumer manual loading](#consumer-manual-loading)
     - [Message inspection and logging](#message-inspection-and-logging)
-    - [Detach connection from NestJS lifecycle](#detach-connection-from-nestjs-lifecycle)
   - [How to build this library locally ?](#how-to-build-this-library-locally)
   - [Planned features](#planned-features)
   - [Contribute](#contribute)
