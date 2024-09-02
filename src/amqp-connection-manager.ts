@@ -21,7 +21,6 @@ import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
 export class AMQPConnectionManager
   implements OnModuleInit, OnApplicationBootstrap, OnApplicationShutdown
 {
-  // private readonly logger: Logger = new Logger(AMQPConnectionManager.name);
   private readonly logger: Console | Logger;
   private rabbitTerminalErrors: string[] = [
     "channel-error",
@@ -33,7 +32,6 @@ export class AMQPConnectionManager
 
   private defaultOptions: Partial<RabbitMQModuleOptions> = {
     extraOptions: {
-      connectionType: "sync",
       logType: "none",
       consumerManualLoad: false,
     },
@@ -103,12 +101,6 @@ export class AMQPConnectionManager
   }
 
   private attachEvents(resolve: any) {
-    if (
-      AMQPConnectionManager.rabbitModuleOptions.extraOptions.connectionType ===
-      "async"
-    )
-      resolve(true);
-
     this.getConnection().on("connect", async ({ url }: { url: string }) => {
       this.logger.log(
         `Rabbit connected to ${url.replace(
@@ -157,14 +149,27 @@ export class AMQPConnectionManager
   }
 
   private async assertExchanges(): Promise<void> {
-    this.logger.debug("Initiating RabbitMQ producers");
+    await new Promise((resolve) => {
+      AMQPConnectionManager.publishChannelWrapper =
+        this.getConnection().createChannel({
+          name: `${process.env.npm_package_name}_publish`,
+          confirm: true,
+          publishTimeout: 60000,
+        });
 
-    AMQPConnectionManager.publishChannelWrapper =
-      this.getConnection().createChannel({
-        name: `${process.env.npm_package_name}_publish`,
-        confirm: true,
-        publishTimeout: 60000,
+      AMQPConnectionManager.publishChannelWrapper.on("connect", () => {
+        this.logger.debug("Initiating RabbitMQ producers");
+        resolve(true);
       });
+
+      AMQPConnectionManager.publishChannelWrapper.on("close", () => {
+        this.logger.debug("Closing RabbitMQ producer channel");
+      });
+
+      AMQPConnectionManager.publishChannelWrapper.on("error", (err, info) => {
+        this.logger.error("Cannot open publish channel", err, info);
+      });
+    });
 
     for (const publisher of AMQPConnectionManager.rabbitModuleOptions
       ?.assertExchanges ?? []) {

@@ -423,14 +423,6 @@ You can also use the `extraOptions.loggerInstance` to pass your custom Logger
 as long as it follows the Logger/Console interfaces. The SDK will use the given
 instance to log any messages
 
-### Detach connection from NestJS lifecycle
-
-By passing the flag `extraOptions.connectionType = 'async'` the library will not
-wait for the connection to be done before releasing the `onModuleInit` lifecycle.
-
-This can be useful if your application does not depend on the AMQP connection
-and is used as a backup or something not central, for example.
-
 ## How to build this library locally ?
 
 Just pull the project and run:

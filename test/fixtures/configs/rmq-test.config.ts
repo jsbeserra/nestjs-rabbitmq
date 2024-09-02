@@ -49,7 +49,6 @@ export class RmqTestConfig implements RabbitOptionsFactory {
       delayExchangeName: delayExchangeName,
       assertExchanges: TestExchanges,
       extraOptions: {
-        connectionType: "sync",
         logType: "all",
       },
       consumerChannels: [
