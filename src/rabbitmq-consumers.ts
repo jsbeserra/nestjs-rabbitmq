@@ -224,7 +224,7 @@ export class RabbitMQConsumer {
       correlationId: args?.consumeMessage?.properties?.correlationId,
       binding,
       title: message,
-      message: {
+      consumedMessage: {
         fields,
         properties,
         content: data ?? JSON.parse(content.toString("utf8")),

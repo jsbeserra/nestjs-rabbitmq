@@ -10,6 +10,7 @@
   - [Motivation](#motivation)
     - [Requirements](#requirements)
     - [Instalation](#instalation)
+    - [PNPM](#pnpm)
   - [Getting Started](#getting-started)
     - [Importing the module](#importing-the-module)
     - [The configuration file](#the-configuration-file)
@@ -24,7 +25,7 @@
   - [Extra options](#extra-options)
     - [Consumer manual loading](#consumer-manual-loading)
     - [Message inspection and logging](#message-inspection-and-logging)
-  - [How to build this library locally ?](#how-to-build-this-library-locally)
+  - [How to build this library locally?](#how-to-build-this-library-locally)
   - [Planned features](#planned-features)
   - [Contribute](#contribute)
   - [License](#license)
@@ -52,7 +53,7 @@ expect.
 
 ### Instalation
 
-**PNPM**
+### PNPM
 
 ```shell
 pnpm add @nestjs-rabbitmq
@@ -69,30 +70,6 @@ yarn add @nestjs-rabbitmq
 ```shell
 npm add @nestjs-rabbitmq
 ```
-
-<!-- ## Connection Management -->
-<!---->
-<!-- This package wraps around the [`amqp-connection-manager`](https://github.com/benbria/node-amqp-connection-manager) -->
-<!-- to manage all AMQP connections with RabbitMQ -->
-<!---->
-<!-- When starting a connection, an instance of `AmqpConnectionManager` is created, passing the following information: -->
-<!---->
-<!-- ```typescript -->
-<!-- this.connection = connect(options.connectionString, { -->
-<!--   heartbeatIntervalInSeconds: 60, -->
-<!--   reconnectTimeInSeconds: 5, -->
-<!--   connectionOptions: { -->
-<!--     keepAlive: true, -->
-<!--     keepAliveDelay: 5000, -->
-<!--     servername: hostname(), -->
-<!--     clientProperties: { -->
-<!--       connection_name: `${process.env.npm_package_name}-${hostname()}`, -->
-<!--     }, -->
-<!--   }, -->
-<!-- }); -->
-<!-- ```` -->
-
-<!-- Esta conexão é então utilizada para criar quaisquer canais necessários para consumidores registrados e um único canal para publicar mensagens, portanto, apenas UMA conexão é criada ao longo de todo o ciclo de vida do SDK. -->
 
 ## Getting Started
 
@@ -119,7 +96,8 @@ to allow the injection of the `RabbitMQService`
 
 ### The configuration file
 
-Create a `rabbitmq.config.ts` or whatever the name you prefer containing the minimum configuration:
+Create a `rabbitmq.config.ts` or whatever the name you prefer containing the
+minimum configuration:
 
 ```typescript
 import { Injectable } from "@nestjs/common";
@@ -147,7 +125,10 @@ export class RabbitOptions implements RabbitOptionsFactory {
 
 ```typescript
 assertExchanges: [
-  { name: 'webhooks', type: 'topic',options: { durable: true, autoDelete: false } },
+  {
+    name: 'webhooks', type: 'topic',
+    options: { durable: true, autoDelete: false }
+  },
   { name: 'test-fanout', type: 'fanout' },
   { name: 'example-direct', type: 'direct'},
 ],
@@ -379,8 +360,11 @@ consumerChannels: [
 When disabled, it is necessary to manually acknowledge the message as follows:
 
 ```typescript
-public async messageHandler(content: any, params: RabbitConsumerParameters): Promise<void> {
-   params.channel.ack(params.message);
+async messageHandler(
+  content: ChangeEventStatusUseCaseInput,
+  params: RabbitConsumerParameters,
+): Promise<void> {
+ params.channel.ack(params.message);
 }
 ```
 
@@ -422,7 +406,7 @@ You can also use the `extraOptions.loggerInstance` to pass your custom Logger
 as long as it follows the Logger/Console interfaces. The SDK will use the given
 instance to log any messages
 
-## How to build this library locally ?
+## How to build this library locally?
 
 Just pull the project and run:
 

@@ -110,7 +110,10 @@ export class RabbitMQService {
       correlationId: properties?.correlationId,
       title: `[AMQP] [PUBLISH] [${exchange}] [${routingKey}]`,
       binding: { exchange, routingKey },
-      message: { content, properties },
+      publishedMessage: {
+        content,
+        properties,
+      },
     };
 
     if (error) {

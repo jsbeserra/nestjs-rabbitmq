@@ -65,7 +65,7 @@ describe("CrashedConnection", () => {
           routingKey: "not_exists.key",
           exchange: "not_exists.exchange",
         },
-        message: {
+        publishedMessage: {
           content: { test: "error" },
         },
         error: "channel closed",
