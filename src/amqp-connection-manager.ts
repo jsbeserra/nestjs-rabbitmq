@@ -34,12 +34,14 @@ export class AMQPConnectionManager
     extraOptions: {
       logType: "none",
       consumerManualLoad: false,
+      heartbeatIntervalInSeconds: 5,
     },
   };
   public static rabbitModuleOptions: RabbitMQModuleOptions;
   public static publishChannelWrapper: ChannelWrapper = null;
   public static connection: AmqpConnectionManager;
   public static isConsumersLoaded: boolean = false;
+  public static errorMessage = null;
   private consumers: ChannelWrapper[] = [];
   private connectionBlockedReason: string;
 

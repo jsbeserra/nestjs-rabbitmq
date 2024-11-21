@@ -1,17 +1,18 @@
+import { Logger } from "@nestjs/common";
 import { AmqpConnectionManager, ChannelWrapper } from "amqp-connection-manager";
-import { IRabbitHandler } from "./rabbitmq.interfaces";
 import { ConfirmChannel, ConsumeMessage } from "amqplib";
+import { IRabbitHandler } from "./rabbitmq.interfaces";
 import {
   LogType,
   RabbitMQConsumerOptions,
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
-import { Logger } from "@nestjs/common";
 
 type InspectInput = {
   consumeMessage: ConsumeMessage;
   data?: any;
   binding: { exchange: string; routingKey: string; queue: string };
+  elapsedTime: bigint;
   error?: any;
 };
 
@@ -23,6 +24,7 @@ export class RabbitMQConsumer {
   private readonly delayExchange: string;
   private readonly publishChannel: ChannelWrapper;
   private readonly logType: LogType;
+  private isOnline: boolean;
   private defaultConsumerOptions: Partial<RabbitMQConsumerOptions> = {
     autoAck: true,
     durable: true,
@@ -101,6 +103,20 @@ export class RabbitMQConsumer {
       },
     });
 
+    consumerChannel.on("connect", () => {
+      // this.logger.log({
+      //   channel: this.options.
+      // });
+      this.isOnline = true;
+    });
+
+    consumerChannel.on("error", (e, i) => {
+      this.logger.error(e, i.name, `AMQP Channel`);
+      this.isOnline = false;
+    });
+
+    consumerChannel.on("close", () => (this.isOnline = false));
+
     return consumerChannel;
   }
 
@@ -111,6 +127,8 @@ export class RabbitMQConsumer {
     callback: IRabbitHandler,
   ): Promise<void> {
     let hasErrors = null;
+    let hasRetried = false;
+    const start = process.hrtime.bigint();
 
     try {
       await callback(JSON.parse(message.content.toString("utf8")), {
@@ -124,7 +142,7 @@ export class RabbitMQConsumer {
       }
     } catch (e) {
       hasErrors = e;
-      await this.processRetry(consumer, message, channel);
+      hasRetried = await this.processRetry(consumer, message);
     } finally {
       if (["consumer", "all"].includes(this.logType) || hasErrors)
         this.inspectConsumer({
@@ -135,7 +153,16 @@ export class RabbitMQConsumer {
           },
           consumeMessage: message,
           error: hasErrors,
+          elapsedTime: process.hrtime.bigint() - start,
         });
+
+      if (this.isOnline) {
+        if ((!hasErrors && consumer.autoAck) || (hasErrors && hasRetried)) {
+          channel.ack(message);
+        } else if (hasErrors && !hasRetried) {
+          channel.nack(message);
+        }
+      }
     }
   }
 
@@ -168,8 +195,9 @@ export class RabbitMQConsumer {
   private async processRetry(
     consumer: RabbitMQConsumerOptions,
     message: ConsumeMessage,
-    channel: ConfirmChannel,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    let isPublished = false;
+
     if (
       consumer.retryStrategy === undefined ||
       consumer.retryStrategy.enabled === undefined ||
@@ -182,7 +210,7 @@ export class RabbitMQConsumer {
         const retryDelay = consumer?.retryStrategy?.delay?.(retryCount) ?? 5000;
 
         try {
-          const isPublished = await this.publishChannel.publish(
+          isPublished = await this.publishChannel.publish(
             this.delayExchange,
             consumer.queue,
             JSON.stringify(JSON.parse(message.content.toString("utf8"))),
@@ -194,21 +222,16 @@ export class RabbitMQConsumer {
               },
             },
           );
-
-          if (isPublished) {
-            channel.ack(message);
-            return;
-          }
         } catch (e) {
           this.logger.error(
             JSON.stringify({ message: "could_not_retry", error: e }),
           );
-          channel.nack(message);
+          isPublished = false;
         }
       }
     }
 
-    channel.nack(message, false, false);
+    return isPublished;
   }
 
   private inspectConsumer(args: InspectInput): void {
@@ -221,6 +244,7 @@ export class RabbitMQConsumer {
 
     const logData = {
       logLevel,
+      duration: args.elapsedTime.toString(),
       correlationId: args?.consumeMessage?.properties?.correlationId,
       binding,
       title: message,

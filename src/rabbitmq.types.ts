@@ -5,81 +5,89 @@ export type RabbitMQExchangeTypes = "direct" | "topic" | "fanout" | "headers";
 export type LogType = "all" | "consumer" | "publisher" | "none";
 
 export type RabbitMQConsumerOptions = {
-  /** Declare the queue parameters and operation */
   /** Name of the Queue */
   queue: string;
+
   /** The SDK will send an ACK at the end of the consumer function
    * If *disabled* your consumer will need to call channel.ack() manually !
-   * Default: true*/
+   * @defaultValue true*/
   autoAck?: boolean;
+
   /** Amount of messages that will be delivered to the consumer at once
-   * Default: 10 */
+   * @default 10 */
   prefetch?: number;
+
   /** If messages enqueued on the queue will be stored on a persistent disk
-   * **WARNING**: If this option is disabled, Rabbit will store the messages in-memory. If RabbitMQ goes offline while messages are enqueued, they will be lost!
-   * Default: true */
+   * @remarks **WARNING**: If this option is disabled, the broker will store the messages in-memory. If RabbitMQ goes offline while messages are enqueued, they will be lost!
+   * @default: true */
   durable?: boolean;
 
   /** If the queue needs to be automatically deleted when there are no consumers attached.
-   * **WARNING**: RabbitMQ will delete the queue no matter the amount of messages enqueued.
-   * Default: false */
+   * @remarks **WARNING**: RabbitMQ will delete the queue no matter the amount of messages enqueued.
+   * @default: false */
   autoDelete?: boolean;
 
-  /** By definition, every queue needs to be attached to an Exchange. Here you can declare the exchange */
-  // exchangeOptions: {
   /** Name of the Exchange */
   exchangeName: string;
 
   /** Routing key between the Queue and the exchange. This acts as a filter so only this routing key will be received by the queue.
+   * @remarks
    * The parameter accepts an array of routing keys and each entry will be declared.
    * For exchanges of the type `fanout` this parameter will be ignored
    * This parameter accepts patterns
-   *   E.g: webhook.`#` - Routes all messages that contains at least `webhook` in the routing key. (webhooks, webhooks.test)
-   *        webhook.\*.test - Routes all messages that contains the described patter (webhook.ABC.test, webhook.123.test) */
+   *
+   * @see {@link https://www.cloudamqp.com/blog/part4-rabbitmq-for-beginners-exchanges-routing-keys-bindings.html} for more about routing keys
+   *
+   * @example
+   * webhook.`#` - Routes all messages that contains at least `webhook` in the routing key. (webhooks, webhooks.test)
+   * webhook.\*.test - Routes all messages that contains the described patter (webhook.ABC.test, webhook.123.test) */
   routingKey: string | string[];
 
   /** When the consumer throwns an error. The message will be automatically enqueued to a retry queue. Here you declare the strategies for retrying */
   retryStrategy?: {
     /** If the retry strategy will be executed.
-     * Default: true */
+     * @default: true */
     enabled?: boolean;
     /** Maximum amount of attempts before sending the message do the DLQ
-     * Default: 5 */
+     * @default: 5 */
     maxAttempts?: number;
+
     /** The delay amount in MS before the retry sends the message to the original queue
-     * Default: 5000*/
+     * @default: 5000*/
     delay?: IDelayProgression;
   };
 
   /** Override default suffix that are defined in this library */
   suffixOptions?: {
+    /**
+     * Suffix used when setting up the DLQ Queues
+     * @default .dlq
+     */
     dlqSuffix?: string;
   };
 };
 
 export type RabbitMQAssertExchange = {
-  /** Name of the exchange to be asserted.
-   * An automatic `.exchange` will be appended to the name in case the exchange name does not have it */
+  /** Name of the exchange to be asserted*/
   name: string;
 
   /** Assert the type of the exchange.
-   * For more information about exchange types: https://www.rabbitmq.com/tutorials/amqp-concepts
-   * */
+   * @see {@link https://www.rabbitmq.com/tutorials/amqp-concepts} for more information about exchange types */
   type: RabbitMQExchangeTypes;
 
   options?: {
     /** If messages that passes through this exchange should be stored on a persistent disk
-     *  **WARNING**: If this option is disabled, Rabbit will store the messages in-memory. If RabbitMQ goes offline while messages are enqueued, they will be lost!
-     * Default: true */
+     *  @remarks **WARNING**: If this option is disabled, Rabbit will store the messages in-memory. If RabbitMQ goes offline while messages are enqueued, they will be lost!
+     * @default true */
     durable?: boolean;
 
     /** If the queue needs to be automatically deleted when there are no consumers attached.
-     * **WARNING**: RabbitMQ will delete the queue no matter the amount of messages enqueued.
-     * Default: false */
+     * @remarks **WARNING**: RabbitMQ will delete the queue no matter the amount of messages enqueued.
+     * @default false */
     autoDelete?: boolean;
 
     /** Declare the exchange as a delayed one, in this scenario the exchange will be declated as a `x-delayed-message` with an argument `x-delayed-type: ${type}`
-     * Default: false */
+     * @default false */
     isDelayed?: boolean;
   };
 };
@@ -89,14 +97,15 @@ export type RabbitMQConsumerChannel = {
 
   /** Callback bind that will be declared as consumer
    * This handler will follow the `IRabbitHandler` interface
-   * E.g: messageHandler: this.yourService.messageHandler.bind(this.yourService)
+   * @example messageHandler: this.yourService.messageHandler.bind(this.yourService)
    */
   messageHandler: IRabbitHandler;
 };
 
 export type RabbitMQModuleOptions = {
   /** Connection URI for the RabbitMQ server
-   * E.g: amqp://{user}:{password}@{url}/{vhost} */
+   * @example amqp://{user}:{password}@{url}/{vhost}
+   * */
   connectionString: string | string[];
 
   /** The name of the centralized retry exchange that will be used
@@ -107,6 +116,7 @@ export type RabbitMQModuleOptions = {
   // /** When **TRUE**, the connection will be made synchronously during the `OnModuleInit` lifecycle
   //  * and will only return after the connection is sucessfully made
   //  * When **FALSE**, the connection is made asynchronously and will release the lifecycle event as fast as possible.
+  //  @ deprecated
   //  * Default: true */
   // waitConnection?: boolean;
 
@@ -120,11 +130,12 @@ export type RabbitMQModuleOptions = {
   extraOptions?: {
     /** When **TRUE** the SDK will not initiate the consumers automatically during the _OnModuleInit_
      * To initiate the consumer, you can call it at the end of the `bootstrap()` on your `main.ts` file
+     * @default false
+     * @example
      * ```javascript
      * const rabbitService: RabbitMQService = app.get(RabbitMQService);
      * await rabbitService.beginConsumers();
-     * ```
-     * Default: false */
+     * ``` */
     consumerManualLoad?: boolean;
 
     /** Enables the message inspection of different parts of the RabbitMQ
@@ -134,9 +145,17 @@ export type RabbitMQModuleOptions = {
     /**
      * Will use the given logger instead of the default Logger from NestJS. Ensure that the logger follows the
      * NestJS Logger or Console interfaces to be used
-     *Default: new Logger()
+     * @default new Logger()
      */
     loggerInstance?: Console | Logger;
+
+    /**
+     *  Interval to send heartbeats to the broker.
+     * @default 5 seconds
+     * @remarks
+     * More info on {@link https://www.rabbitmq.com/docs/heartbeats}
+     */
+    heartbeatIntervalInSeconds?: number;
   };
 };
 
