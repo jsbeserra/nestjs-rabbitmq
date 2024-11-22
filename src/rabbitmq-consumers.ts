@@ -1,6 +1,7 @@
 import { Logger } from "@nestjs/common";
 import { AmqpConnectionManager, ChannelWrapper } from "amqp-connection-manager";
 import { ConfirmChannel, ConsumeMessage } from "amqplib";
+import { tryParseJson } from "./helper";
 import { IRabbitHandler } from "./rabbitmq.interfaces";
 import {
   LogType,
@@ -22,6 +23,7 @@ export class RabbitMQConsumer {
   private readonly connection: AmqpConnectionManager;
   private readonly options: RabbitMQModuleOptions;
   private readonly delayExchange: string;
+  private consumerQueue;
   private readonly publishChannel: ChannelWrapper;
   private readonly logType: LogType;
   private isOnline: boolean;
@@ -59,6 +61,8 @@ export class RabbitMQConsumer {
       ...this.defaultConsumerOptions,
       ...consumer,
     };
+
+    this.consumerQueue = consumer.queue;
 
     const consumerChannel = this.connection.createChannel({
       confirm: true,
@@ -104,18 +108,20 @@ export class RabbitMQConsumer {
     });
 
     consumerChannel.on("connect", () => {
-      // this.logger.log({
-      //   channel: this.options.
-      // });
+      console.log("Channel CONNECTED", this.consumerQueue);
       this.isOnline = true;
     });
 
     consumerChannel.on("error", (e, i) => {
+      console.log("Channel ERROR", this.consumerQueue);
       this.logger.error(e, i.name, `AMQP Channel`);
       this.isOnline = false;
     });
 
-    consumerChannel.on("close", () => (this.isOnline = false));
+    consumerChannel.on("close", () => {
+      console.log("Channel CLOSED", this.consumerQueue);
+      this.isOnline = false;
+    });
 
     return consumerChannel;
   }
@@ -131,18 +137,20 @@ export class RabbitMQConsumer {
     const start = process.hrtime.bigint();
 
     try {
-      await callback(JSON.parse(message.content.toString("utf8")), {
+      await callback(tryParseJson(message.content.toString("utf8")), {
         message,
         channel,
         queue: consumer.queue,
       });
-
-      if (consumer.autoAck) {
-        channel.ack(message);
-      }
     } catch (e) {
       hasErrors = e;
       hasRetried = await this.processRetry(consumer, message);
+
+      try {
+        channel.ack(message);
+      } catch (e) {
+        console.log(e);
+      }
     } finally {
       if (["consumer", "all"].includes(this.logType) || hasErrors)
         this.inspectConsumer({
@@ -160,7 +168,7 @@ export class RabbitMQConsumer {
         if ((!hasErrors && consumer.autoAck) || (hasErrors && hasRetried)) {
           channel.ack(message);
         } else if (hasErrors && !hasRetried) {
-          channel.nack(message);
+          channel.nack(message, false, false);
         }
       }
     }
@@ -213,7 +221,7 @@ export class RabbitMQConsumer {
           isPublished = await this.publishChannel.publish(
             this.delayExchange,
             consumer.queue,
-            JSON.stringify(JSON.parse(message.content.toString("utf8"))),
+            JSON.stringify(tryParseJson(message.content.toString("utf8"))),
             {
               headers: {
                 ...message.properties.headers,
@@ -223,9 +231,7 @@ export class RabbitMQConsumer {
             },
           );
         } catch (e) {
-          this.logger.error(
-            JSON.stringify({ message: "could_not_retry", error: e }),
-          );
+          this.logger.error({ message: "could_not_retry", error: e });
           isPublished = false;
         }
       }
@@ -251,7 +257,7 @@ export class RabbitMQConsumer {
       consumedMessage: {
         fields,
         properties,
-        content: data ?? JSON.parse(content.toString("utf8")),
+        content: data ?? tryParseJson(content.toString("utf8")),
       },
     };
 

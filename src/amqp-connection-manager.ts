@@ -122,9 +122,12 @@ export class AMQPConnectionManager
         )
       ) {
         this.getConnection().close();
-        this.logger.error(
-          "RabbitMQ Disconnected with a terminal error, impossible to reconnect",
-        );
+
+        this.logger.error({
+          message: `RabbitMQ Disconnected with a terminal error, impossible to reconnect `,
+          error: err,
+          x: err.message,
+        });
       }
     });
 
