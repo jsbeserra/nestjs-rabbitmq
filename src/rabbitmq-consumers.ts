@@ -107,22 +107,6 @@ export class RabbitMQConsumer {
       },
     });
 
-    consumerChannel.on("connect", () => {
-      console.log("Channel CONNECTED", this.consumerQueue);
-      this.isOnline = true;
-    });
-
-    consumerChannel.on("error", (e, i) => {
-      console.log("Channel ERROR", this.consumerQueue);
-      this.logger.error(e, i.name, `AMQP Channel`);
-      this.isOnline = false;
-    });
-
-    consumerChannel.on("close", () => {
-      console.log("Channel CLOSED", this.consumerQueue);
-      this.isOnline = false;
-    });
-
     return consumerChannel;
   }
 
