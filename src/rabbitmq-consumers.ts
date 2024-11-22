@@ -8,6 +8,7 @@ import {
   RabbitMQConsumerOptions,
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
+import { AMQPConnectionManager } from "./amqp-connection-manager";
 
 type InspectInput = {
   consumeMessage: ConsumeMessage;
@@ -15,6 +16,7 @@ type InspectInput = {
   binding: { exchange: string; routingKey: string; queue: string };
   elapsedTime: bigint;
   error?: any;
+  isDead: boolean;
 };
 
 export class RabbitMQConsumer {
@@ -23,10 +25,8 @@ export class RabbitMQConsumer {
   private readonly connection: AmqpConnectionManager;
   private readonly options: RabbitMQModuleOptions;
   private readonly delayExchange: string;
-  private consumerQueue;
   private readonly publishChannel: ChannelWrapper;
   private readonly logType: LogType;
-  private isOnline: boolean;
   private defaultConsumerOptions: Partial<RabbitMQConsumerOptions> = {
     autoAck: true,
     durable: true,
@@ -61,8 +61,6 @@ export class RabbitMQConsumer {
       ...this.defaultConsumerOptions,
       ...consumer,
     };
-
-    this.consumerQueue = consumer.queue;
 
     const consumerChannel = this.connection.createChannel({
       confirm: true,
@@ -129,12 +127,6 @@ export class RabbitMQConsumer {
     } catch (e) {
       hasErrors = e;
       hasRetried = await this.processRetry(consumer, message);
-
-      try {
-        channel.ack(message);
-      } catch (e) {
-        console.log(e);
-      }
     } finally {
       if (["consumer", "all"].includes(this.logType) || hasErrors)
         this.inspectConsumer({
@@ -146,15 +138,10 @@ export class RabbitMQConsumer {
           consumeMessage: message,
           error: hasErrors,
           elapsedTime: process.hrtime.bigint() - start,
+          isDead: hasErrors && !hasRetried,
         });
 
-      if (this.isOnline) {
-        if ((!hasErrors && consumer.autoAck) || (hasErrors && hasRetried)) {
-          channel.ack(message);
-        } else if (hasErrors && !hasRetried) {
-          channel.nack(message, false, false);
-        }
-      }
+      this.ackMessage(channel, message, consumer, hasErrors, hasRetried);
     }
   }
 
@@ -238,6 +225,7 @@ export class RabbitMQConsumer {
       correlationId: args?.consumeMessage?.properties?.correlationId,
       binding,
       title: message,
+      isDead: args.isDead,
       consumedMessage: {
         fields,
         properties,
@@ -249,5 +237,24 @@ export class RabbitMQConsumer {
       Object.assign(logData, { error: error.message ?? error.toString() });
 
     this.logger[logLevel](JSON.stringify(logData));
+  }
+
+  private ackMessage(
+    channel: ConfirmChannel,
+    message: ConsumeMessage,
+    consumer: RabbitMQConsumerOptions,
+    hasErrors: boolean,
+    hasRetried: boolean,
+  ): void {
+    if (!AMQPConnectionManager.connection.isConnected()) {
+      this.logger.error("Could not acknowledge message, Connection is offline");
+      return;
+    }
+
+    if ((!hasErrors && consumer.autoAck) || (hasErrors && hasRetried)) {
+      channel.ack(message);
+    } else if (hasErrors && !hasRetried) {
+      channel.nack(message, false, false);
+    }
   }
 }
