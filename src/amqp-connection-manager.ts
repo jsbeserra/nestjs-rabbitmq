@@ -34,12 +34,15 @@ export class AMQPConnectionManager
     extraOptions: {
       logType: "none",
       consumerManualLoad: false,
+      heartbeatIntervalInSeconds: 5,
+      reconnectTimeInSeconds: 5,
     },
   };
   public static rabbitModuleOptions: RabbitMQModuleOptions;
   public static publishChannelWrapper: ChannelWrapper = null;
   public static connection: AmqpConnectionManager;
   public static isConsumersLoaded: boolean = false;
+  public static errorMessage = null;
   private consumers: ChannelWrapper[] = [];
   private connectionBlockedReason: string;
 
@@ -81,8 +84,12 @@ export class AMQPConnectionManager
       AMQPConnectionManager.connection = connect(
         AMQPConnectionManager.rabbitModuleOptions.connectionString,
         {
-          heartbeatIntervalInSeconds: 5,
-          reconnectTimeInSeconds: 5,
+          heartbeatIntervalInSeconds:
+            AMQPConnectionManager.rabbitModuleOptions.extraOptions
+              .heartbeatIntervalInSeconds,
+          reconnectTimeInSeconds:
+            AMQPConnectionManager.rabbitModuleOptions.extraOptions
+              .reconnectTimeInSeconds,
           connectionOptions: {
             keepAlive: true,
             keepAliveDelay: 5000,
@@ -120,9 +127,12 @@ export class AMQPConnectionManager
         )
       ) {
         this.getConnection().close();
-        this.logger.error(
-          "RabbitMQ Disconnected with a terminal error, impossible to reconnect",
-        );
+
+        this.logger.error({
+          message: `RabbitMQ Disconnected with a terminal error, impossible to reconnect `,
+          error: err,
+          x: err.message,
+        });
       }
     });
 

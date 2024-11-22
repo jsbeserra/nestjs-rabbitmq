@@ -35,6 +35,7 @@ export class RabbitMQService {
     options?: PublishOptions,
   ): Promise<boolean> {
     let hasErrors = null;
+    const start = process.hrtime.bigint();
 
     try {
       await AMQPConnectionManager.publishChannelWrapper.publish(
@@ -53,6 +54,7 @@ export class RabbitMQService {
         exchangeName,
         routingKey,
         message,
+        process.hrtime.bigint() - start,
         options,
         hasErrors,
       );
@@ -93,6 +95,7 @@ export class RabbitMQService {
     exchange: string,
     routingKey: string,
     content: any,
+    elapsedTime: bigint,
     properties?: PublishOptions,
     error?: any,
   ): void {
@@ -107,6 +110,7 @@ export class RabbitMQService {
     const logLevel = error ? "error" : "log";
     const logData = {
       logLevel,
+      duration: elapsedTime.toString(),
       correlationId: properties?.correlationId,
       title: `[AMQP] [PUBLISH] [${exchange}] [${routingKey}]`,
       binding: { exchange, routingKey },

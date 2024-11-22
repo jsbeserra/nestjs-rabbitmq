@@ -1,17 +1,19 @@
+import { Logger } from "@nestjs/common";
 import { AmqpConnectionManager, ChannelWrapper } from "amqp-connection-manager";
-import { IRabbitHandler } from "./rabbitmq.interfaces";
 import { ConfirmChannel, ConsumeMessage } from "amqplib";
+import { tryParseJson } from "./helper";
+import { IRabbitHandler } from "./rabbitmq.interfaces";
 import {
   LogType,
   RabbitMQConsumerOptions,
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
-import { Logger } from "@nestjs/common";
 
 type InspectInput = {
   consumeMessage: ConsumeMessage;
   data?: any;
   binding: { exchange: string; routingKey: string; queue: string };
+  elapsedTime: bigint;
   error?: any;
 };
 
@@ -21,8 +23,10 @@ export class RabbitMQConsumer {
   private readonly connection: AmqpConnectionManager;
   private readonly options: RabbitMQModuleOptions;
   private readonly delayExchange: string;
+  private consumerQueue;
   private readonly publishChannel: ChannelWrapper;
   private readonly logType: LogType;
+  private isOnline: boolean;
   private defaultConsumerOptions: Partial<RabbitMQConsumerOptions> = {
     autoAck: true,
     durable: true,
@@ -57,6 +61,8 @@ export class RabbitMQConsumer {
       ...this.defaultConsumerOptions,
       ...consumer,
     };
+
+    this.consumerQueue = consumer.queue;
 
     const consumerChannel = this.connection.createChannel({
       confirm: true,
@@ -111,20 +117,24 @@ export class RabbitMQConsumer {
     callback: IRabbitHandler,
   ): Promise<void> {
     let hasErrors = null;
+    let hasRetried = false;
+    const start = process.hrtime.bigint();
 
     try {
-      await callback(JSON.parse(message.content.toString("utf8")), {
+      await callback(tryParseJson(message.content.toString("utf8")), {
         message,
         channel,
         queue: consumer.queue,
       });
-
-      if (consumer.autoAck) {
-        channel.ack(message);
-      }
     } catch (e) {
       hasErrors = e;
-      await this.processRetry(consumer, message, channel);
+      hasRetried = await this.processRetry(consumer, message);
+
+      try {
+        channel.ack(message);
+      } catch (e) {
+        console.log(e);
+      }
     } finally {
       if (["consumer", "all"].includes(this.logType) || hasErrors)
         this.inspectConsumer({
@@ -135,7 +145,16 @@ export class RabbitMQConsumer {
           },
           consumeMessage: message,
           error: hasErrors,
+          elapsedTime: process.hrtime.bigint() - start,
         });
+
+      if (this.isOnline) {
+        if ((!hasErrors && consumer.autoAck) || (hasErrors && hasRetried)) {
+          channel.ack(message);
+        } else if (hasErrors && !hasRetried) {
+          channel.nack(message, false, false);
+        }
+      }
     }
   }
 
@@ -168,8 +187,9 @@ export class RabbitMQConsumer {
   private async processRetry(
     consumer: RabbitMQConsumerOptions,
     message: ConsumeMessage,
-    channel: ConfirmChannel,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    let isPublished = false;
+
     if (
       consumer.retryStrategy === undefined ||
       consumer.retryStrategy.enabled === undefined ||
@@ -182,10 +202,10 @@ export class RabbitMQConsumer {
         const retryDelay = consumer?.retryStrategy?.delay?.(retryCount) ?? 5000;
 
         try {
-          const isPublished = await this.publishChannel.publish(
+          isPublished = await this.publishChannel.publish(
             this.delayExchange,
             consumer.queue,
-            JSON.stringify(JSON.parse(message.content.toString("utf8"))),
+            JSON.stringify(tryParseJson(message.content.toString("utf8"))),
             {
               headers: {
                 ...message.properties.headers,
@@ -194,21 +214,14 @@ export class RabbitMQConsumer {
               },
             },
           );
-
-          if (isPublished) {
-            channel.ack(message);
-            return;
-          }
         } catch (e) {
-          this.logger.error(
-            JSON.stringify({ message: "could_not_retry", error: e }),
-          );
-          channel.nack(message);
+          this.logger.error({ message: "could_not_retry", error: e });
+          isPublished = false;
         }
       }
     }
 
-    channel.nack(message, false, false);
+    return isPublished;
   }
 
   private inspectConsumer(args: InspectInput): void {
@@ -221,13 +234,14 @@ export class RabbitMQConsumer {
 
     const logData = {
       logLevel,
+      duration: args.elapsedTime.toString(),
       correlationId: args?.consumeMessage?.properties?.correlationId,
       binding,
       title: message,
       consumedMessage: {
         fields,
         properties,
-        content: data ?? JSON.parse(content.toString("utf8")),
+        content: data ?? tryParseJson(content.toString("utf8")),
       },
     };
 
