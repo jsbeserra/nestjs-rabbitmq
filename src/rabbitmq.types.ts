@@ -156,6 +156,11 @@ export type RabbitMQModuleOptions = {
      * More info on {@link https://www.rabbitmq.com/docs/heartbeats}
      */
     heartbeatIntervalInSeconds?: number;
+
+    /**
+     * Time between reconnection attempts when a channel/broker connection fails
+     * @default 5 seconds */
+    reconnectTimeInSeconds?: number;
   };
 };
 

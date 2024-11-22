@@ -35,6 +35,7 @@ export class AMQPConnectionManager
       logType: "none",
       consumerManualLoad: false,
       heartbeatIntervalInSeconds: 5,
+      reconnectTimeInSeconds: 5,
     },
   };
   public static rabbitModuleOptions: RabbitMQModuleOptions;
@@ -83,8 +84,12 @@ export class AMQPConnectionManager
       AMQPConnectionManager.connection = connect(
         AMQPConnectionManager.rabbitModuleOptions.connectionString,
         {
-          heartbeatIntervalInSeconds: 5,
-          reconnectTimeInSeconds: 5,
+          heartbeatIntervalInSeconds:
+            AMQPConnectionManager.rabbitModuleOptions.extraOptions
+              .heartbeatIntervalInSeconds,
+          reconnectTimeInSeconds:
+            AMQPConnectionManager.rabbitModuleOptions.extraOptions
+              .reconnectTimeInSeconds,
           connectionOptions: {
             keepAlive: true,
             keepAliveDelay: 5000,
