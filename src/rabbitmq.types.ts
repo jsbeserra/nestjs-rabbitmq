@@ -1,5 +1,9 @@
 import { Logger } from "@nestjs/common";
-import { IDelayProgression, IRabbitHandler } from "./rabbitmq.interfaces";
+import {
+  IDelayProgression,
+  IRabbitDeadletterCallback,
+  IRabbitHandler,
+} from "./rabbitmq.interfaces";
 
 export type RabbitMQExchangeTypes = "direct" | "topic" | "fanout" | "headers";
 export type LogType = "all" | "consumer" | "publisher" | "none";
@@ -48,6 +52,7 @@ export type RabbitMQConsumerOptions = {
     /** If the retry strategy will be executed.
      * @default: true */
     enabled?: boolean;
+
     /** Maximum amount of attempts before sending the message do the DLQ
      * @default: 5 */
     maxAttempts?: number;
@@ -57,14 +62,30 @@ export type RabbitMQConsumerOptions = {
     delay?: IDelayProgression;
   };
 
-  /** Override default suffix that are defined in this library */
-  suffixOptions?: {
+  deadLetterStrategy?: {
+    /** Callback that will be executed before sending the message to the DLQ
+     * This handler will follow the `IRabbitDeadletterCallback` _interface and expects
+     * the return of a boolean_. If the return is `TRUE`, it will send the message
+     * to the DLQ right after, otherwise, it will skip sending it
+     * @example messageHandler: this.yourService.deadLetterFunction.bind(this.yourService)
+     */
+    callback?: IRabbitDeadletterCallback;
+
     /**
      * Suffix used when setting up the DLQ Queues
      * @default .dlq
      */
-    dlqSuffix?: string;
+    suffix?: string;
   };
+
+  // /** Override default suffix that are defined in this library */
+  // suffixOptions?: {
+  //   /**
+  //    * Suffix used when setting up the DLQ Queues
+  //    * @default .dlq
+  //    */
+  //   dlqSuffix?: string;
+  // };
 };
 
 export type RabbitMQAssertExchange = {

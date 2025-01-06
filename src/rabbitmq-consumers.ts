@@ -32,6 +32,16 @@ export class RabbitMQConsumer {
     durable: true,
     prefetch: 10,
     autoDelete: false,
+    retryStrategy: {
+      enabled: true,
+      maxAttempts: 5,
+      delay: () => 5000,
+    },
+    deadLetterStrategy: {
+      enabled: true,
+      callback: async () => true,
+      suffix: ".dlq",
+    },
   };
 
   constructor(
@@ -71,7 +81,7 @@ export class RabbitMQConsumer {
           channel.assertQueue(consumer.queue, {
             durable: consumer.durable,
             autoDelete: consumer.autoDelete,
-            deadLetterRoutingKey: `${consumer.queue}${consumer.suffixOptions?.dlqSuffix ?? ".dlq"}`,
+            deadLetterRoutingKey: `${consumer.queue}${consumer.deadLetterStrategy.suffix}`,
             deadLetterExchange: "",
           }),
 
@@ -149,7 +159,7 @@ export class RabbitMQConsumer {
     channel: ConfirmChannel,
     consumer: RabbitMQConsumerOptions,
   ): Promise<void> {
-    const deadletterQueue = `${consumer.queue}${consumer.suffixOptions?.dlqSuffix ?? ".dlq"}`;
+    const deadletterQueue = `${consumer.queue}${consumer.deadLetterStrategy.suffix}`;
     await channel.assertQueue(deadletterQueue, { durable: true });
 
     if (consumer?.retryStrategy?.enabled == false) {
@@ -183,10 +193,10 @@ export class RabbitMQConsumer {
       consumer?.retryStrategy.enabled
     ) {
       const retryCount = message.properties?.headers?.["retriesCount"] ?? 0;
-      const maxRetry = consumer?.retryStrategy?.maxAttempts ?? 5;
+      const maxRetry = consumer.retryStrategy.maxAttempts;
 
       if (retryCount < maxRetry) {
-        const retryDelay = consumer?.retryStrategy?.delay?.(retryCount) ?? 5000;
+        const retryDelay = consumer.retryStrategy.delay(retryCount);
 
         try {
           isPublished = await this.publishChannel.publish(
@@ -239,13 +249,13 @@ export class RabbitMQConsumer {
     this.logger[logLevel](JSON.stringify(logData));
   }
 
-  private ackMessage(
+  private async ackMessage(
     channel: ConfirmChannel,
     message: ConsumeMessage,
     consumer: RabbitMQConsumerOptions,
     hasErrors: boolean,
     hasRetried: boolean,
-  ): void {
+  ): Promise<void> {
     if (!AMQPConnectionManager.connection.isConnected()) {
       this.logger.error("Could not acknowledge message, Connection is offline");
       return;
@@ -254,7 +264,21 @@ export class RabbitMQConsumer {
     if ((!hasErrors && consumer.autoAck) || (hasErrors && hasRetried)) {
       channel.ack(message);
     } else if (hasErrors && !hasRetried) {
-      channel.nack(message, false, false);
+      let shouldNack = true;
+
+      try {
+        shouldNack = await consumer.deadLetterStrategy.callback(
+          message.content.toString("utf8"),
+        );
+      } catch (e) {
+        this.logger.error({
+          logLevel: "error",
+          title: `[AMQP] [DEADLETTER] ${message.fields.exchange} ${message.fields.routingKey} ${message.fields} ${consumer.queue}`,
+          error: e.message ?? e.toString(),
+        });
+      }
+
+      if (shouldNack) channel.nack(message, false, false);
     }
   }
 }
