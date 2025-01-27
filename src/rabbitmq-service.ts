@@ -4,6 +4,7 @@ import { AMQPConnectionManager } from "./amqp-connection-manager";
 import { PublishOptions } from "./rabbitmq.types";
 import { RabbitMQConsumer } from "./rabbitmq-consumers";
 import { ChannelWrapper } from "amqp-connection-manager";
+import stringify from "faster-stable-stringify";
 
 export class RabbitMQService {
   private logger: Console | Logger =
@@ -41,7 +42,7 @@ export class RabbitMQService {
       await AMQPConnectionManager.publishChannelWrapper.publish(
         exchangeName,
         routingKey,
-        JSON.stringify(message),
+        stringify(message),
         {
           correlationId: randomUUID(),
           ...options,
@@ -120,10 +121,9 @@ export class RabbitMQService {
       },
     };
 
-    if (error) {
-      Object.assign(logData, { error: error.message ?? error.toString() });
-    }
+    if (error) logData["error"] = error;
 
-    this.logger[logLevel](JSON.stringify(logData));
+    //Check if I need stringify
+    this.logger[logLevel](logData);
   }
 }

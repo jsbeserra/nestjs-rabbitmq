@@ -13,7 +13,7 @@ export interface IRabbitHandler<T = any> {
 }
 
 export interface IRabbitDeadletterCallback<T = any> {
-  (content: T): Promise<boolean>;
+  (content: T): Promise<boolean> | boolean;
 }
 
 export interface IDelayProgression {

@@ -1,4 +1,4 @@
-import { Logger } from "@nestjs/common";
+import { ConsoleLogger, Logger } from "@nestjs/common";
 import { AmqpConnectionManager, ChannelWrapper } from "amqp-connection-manager";
 import { ConfirmChannel, ConsumeMessage } from "amqplib";
 import { tryParseJson } from "./helper";
@@ -9,6 +9,7 @@ import {
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
 import { AMQPConnectionManager } from "./amqp-connection-manager";
+import stringify from "faster-stable-stringify";
 
 type InspectInput = {
   consumeMessage: ConsumeMessage;
@@ -38,7 +39,6 @@ export class RabbitMQConsumer {
       delay: () => 5000,
     },
     deadLetterStrategy: {
-      enabled: true,
       callback: async () => true,
       suffix: ".dlq",
     },
@@ -202,7 +202,7 @@ export class RabbitMQConsumer {
           isPublished = await this.publishChannel.publish(
             this.delayExchange,
             consumer.queue,
-            JSON.stringify(tryParseJson(message.content.toString("utf8"))),
+            stringify(tryParseJson(message.content.toString("utf8"))),
             {
               headers: {
                 ...message.properties.headers,
@@ -224,6 +224,14 @@ export class RabbitMQConsumer {
   private inspectConsumer(args: InspectInput): void {
     const { binding, consumeMessage, data, error } = args;
 
+    // console.log({
+    //   typeof: typeof Error,
+    //   toString: error.toString(),
+    //   stack: error?.stack,
+    //   message: error?.message,
+    //   name: error?.name,
+    // });
+
     const { exchange, routingKey, queue } = binding;
     const { content, fields, properties } = consumeMessage;
     const message = `[AMQP] [CONSUMER] [${exchange}] [${routingKey}] [${queue}]`;
@@ -243,10 +251,15 @@ export class RabbitMQConsumer {
       },
     };
 
-    if (error)
-      Object.assign(logData, { error: error.message ?? error.toString() });
+    if (error) {
+      logData["error"] = {
+        stack: error?.stack,
+        message: error?.message,
+        name: error?.name,
+      };
+    }
 
-    this.logger[logLevel](JSON.stringify(logData));
+    this.logger[logLevel](logData);
   }
 
   private async ackMessage(
@@ -267,18 +280,27 @@ export class RabbitMQConsumer {
       let shouldNack = true;
 
       try {
-        shouldNack = await consumer.deadLetterStrategy.callback(
-          message.content.toString("utf8"),
-        );
+        shouldNack =
+          (await consumer.deadLetterStrategy?.callback?.(
+            message.content.toString("utf8"),
+          )) ?? true;
       } catch (e) {
         this.logger.error({
           logLevel: "error",
           title: `[AMQP] [DEADLETTER] ${message.fields.exchange} ${message.fields.routingKey} ${message.fields} ${consumer.queue}`,
-          error: e.message ?? e.toString(),
+          error: {
+            stack: e?.stack,
+            message: e?.message,
+            name: e?.name,
+          },
         });
       }
 
-      if (shouldNack) channel.nack(message, false, false);
+      if (shouldNack) {
+        channel.nack(message, false, false);
+      } else {
+        channel.ack(message);
+      }
     }
   }
 }
