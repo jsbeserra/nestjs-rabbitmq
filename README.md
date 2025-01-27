@@ -21,6 +21,7 @@
     - [Strongly typed consumer](#strongly-typed-consumer)
     - [Declaration example](#declaration-example)
   - [Retrying strategy](#retrying-strategy)
+  - [Deadletter strategy](#deadletter-strategy)
   - [Disabling the automatic ack](#disabling-the-automatic-ack)
   - [Extra options](#extra-options)
     - [Consumer manual loading](#consumer-manual-loading)
