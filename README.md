@@ -343,6 +343,37 @@ the `delayExchangeName` exchange as the retrying orchestrator where the
 When the maximum attempts is reached, the library issues a nack, sending the
 message to the `.dlq` queue.
 
+## Deadletter strategy
+
+Each consumer can have an optional parameter `deadletterStrategy` with the
+following contract:
+
+```typescript
+retryStrategy: {
+  suffix: string
+  callback?: (content: T): boolean | Promise<boolean>;
+}
+```
+
+By default the `suffix` for all DLQs will be `.dlq`.
+
+When giving a callback function, the library will execute it after finishing
+executing all retry attempts. This is useful if, in case of failure, you want
+to update your database, send an alert or anything else.
+
+The function expects you to return a boolean, where depending on the result
+it will behave differently, such as:
+
+- When returning `TRUE`, the callback will be executed and the message will be
+  forwarded to DLQ
+- When returning `FALSE`, **the message will not be sent to the DLQ, skipping
+  it entirely**, allowing you to drop messages if the callback execution is
+  successful
+
+Finally, if the callback throws any errors or is unable to be executed,
+an error message will be thrown with the reason and the message will be
+forwarded to the DLQ normally.
+
 ## Disabling the automatic ack
 
 By default, the consumer will automatically send an ack at the end of the
