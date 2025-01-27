@@ -81,7 +81,7 @@ export class RabbitMQConsumer {
           channel.assertQueue(consumer.queue, {
             durable: consumer.durable,
             autoDelete: consumer.autoDelete,
-            deadLetterRoutingKey: `${consumer.queue}${consumer.deadLetterStrategy.suffix}`,
+            deadLetterRoutingKey: `${consumer.queue}${consumer.deadLetterStrategy?.suffix ?? ".dlq"}`,
             deadLetterExchange: "",
           }),
 
@@ -159,7 +159,7 @@ export class RabbitMQConsumer {
     channel: ConfirmChannel,
     consumer: RabbitMQConsumerOptions,
   ): Promise<void> {
-    const deadletterQueue = `${consumer.queue}${consumer.deadLetterStrategy.suffix}`;
+    const deadletterQueue = `${consumer.queue}${consumer.deadLetterStrategy?.suffix ?? ".dlq"}`;
     await channel.assertQueue(deadletterQueue, { durable: true });
 
     if (consumer?.retryStrategy?.enabled == false) {
