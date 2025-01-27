@@ -66,7 +66,7 @@ describe("AMQPConnectionManager Late Loading", () => {
     const loggerSpy = jest.spyOn(Logger.prototype, "log");
     jest
       .spyOn(RmqTestService.prototype, "messageHandler")
-      .mockImplementation(async () => {});
+      .mockImplementation(async () => { });
 
     const isPublished = await rabbitMqService.publish(
       TestConsumers[0].exchangeName,

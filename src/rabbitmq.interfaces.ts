@@ -12,6 +12,10 @@ export interface IRabbitHandler<T = any> {
   (content: T, parameters?: RabbitConsumerParameters): Promise<void>;
 }
 
+export interface IRabbitDeadletterCallback<T = any> {
+  (content: T): Promise<boolean> | boolean;
+}
+
 export interface IDelayProgression {
   (attempt: number): number;
 }
