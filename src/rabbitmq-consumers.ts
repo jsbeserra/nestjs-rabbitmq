@@ -124,7 +124,6 @@ export class RabbitMQConsumer {
               return;
             }
 
-            console.log({ ret });
             await this.processConsumerMessage(
               message,
               channel,
@@ -337,10 +336,6 @@ export class RabbitMQConsumer {
         channel.ack(message);
         throw new Error("Routing key not registered");
       }
-
-      console.log(
-        `MANDANDO MENSAGEM ${consumer.routingKey} -> ${newConsumer.options.routingKey}`,
-      );
 
       return {
         newOptions: { ...newConsumer.options, ...this.defaultConsumerOptions },
