@@ -154,8 +154,6 @@ export class RabbitMQConsumer {
         channel,
         queue: consumer.queue,
       });
-
-      console.log("TERMINOU CALLBACK");
     } catch (e) {
       hasErrors = e;
       hasRetried = await this.processRetry(consumer, message);
@@ -288,7 +286,6 @@ export class RabbitMQConsumer {
       return;
     }
 
-    console.log({ hasErrors, hasRetried, autoAck: consumer.autoAck });
     if ((!hasErrors && consumer?.autoAck) || (hasErrors && hasRetried)) {
       channel.ack(message);
     } else if (hasErrors && !hasRetried) {
