@@ -13,9 +13,12 @@ import {
 } from "amqp-connection-manager";
 import { ConfirmChannel } from "amqplib";
 import { hostname } from "node:os";
-import { RabbitMQModuleOptions } from "./rabbitmq.types";
+import {
+  RabbitMQConsumerOptions,
+  RabbitMQModuleOptions,
+} from "./rabbitmq.types";
 import { RabbitMQConsumer } from "./rabbitmq-consumers";
-import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
+import { IRabbitHandler, RabbitOptionsFactory } from "./rabbitmq.interfaces";
 
 @Injectable()
 export class AMQPConnectionManager
@@ -43,7 +46,14 @@ export class AMQPConnectionManager
   public static connection: AmqpConnectionManager;
   public static isConsumersLoaded: boolean = false;
   public static errorMessage = null;
-  private consumers: ChannelWrapper[] = [];
+  public static consumers: Map<
+    string,
+    {
+      options: RabbitMQConsumerOptions;
+      channel: ChannelWrapper;
+      callback: IRabbitHandler;
+    }
+  > = new Map();
   private connectionBlockedReason: string;
 
   constructor(@Inject("RABBIT_OPTIONS") options: RabbitOptionsFactory) {
@@ -73,10 +83,6 @@ export class AMQPConnectionManager
   async onApplicationShutdown() {
     this.logger.log("Closing RabbitMQ Connection");
     await AMQPConnectionManager?.connection?.close();
-  }
-
-  getConsumers() {
-    return this.consumers;
   }
 
   private async connect() {
@@ -208,12 +214,17 @@ export class AMQPConnectionManager
     for (const consumerEntry of consumerList) {
       const consumer = consumerEntry.options;
 
-      this.consumers.push(
-        await new RabbitMQConsumer(
-          AMQPConnectionManager.connection,
-          AMQPConnectionManager.rabbitModuleOptions,
-          AMQPConnectionManager.publishChannelWrapper,
-        ).createConsumer(consumer, consumerEntry.messageHandler),
+      AMQPConnectionManager.consumers.set(
+        `${consumer.exchangeName}-${consumer.routingKey}`,
+        {
+          options: consumer,
+          channel: await new RabbitMQConsumer(
+            AMQPConnectionManager.connection,
+            AMQPConnectionManager.rabbitModuleOptions,
+            AMQPConnectionManager.publishChannelWrapper,
+          ).createConsumer(consumer, consumerEntry.messageHandler),
+          callback: consumerEntry.messageHandler,
+        },
       );
     }
 

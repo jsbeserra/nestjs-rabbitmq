@@ -123,7 +123,7 @@ export class RabbitMQService {
 
     if (error) logData["error"] = error;
 
-    //Check if I need stringify
+    //TODO: Check if I need stringify
     this.logger[logLevel](logData);
   }
 }

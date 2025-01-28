@@ -10,6 +10,7 @@ import {
 } from "./rabbitmq.types";
 import { AMQPConnectionManager } from "./amqp-connection-manager";
 import stringify from "faster-stable-stringify";
+import { cpSync } from "fs";
 
 type InspectInput = {
   consumeMessage: ConsumeMessage;
@@ -104,11 +105,31 @@ export class RabbitMQConsumer {
           this.attachRetryAndDLQ(channel, consumer),
 
           channel.consume(consumer.queue, async (message) => {
+            let ret: { newOptions; newCallback };
+
+            try {
+              ret = this.verify(consumer, message, channel);
+            } catch (e) {
+              this.logger.warn({
+                logLevel: "warn",
+                binding: {
+                  queue: consumer.queue,
+                  routingKey: message.fields.routingKey,
+                  exchange: consumer.exchangeName,
+                },
+                title: `[AMQP] [ROUTING_KEY_NOT_REGISTERED] [${message.fields.routingKey}]`,
+                consumerMessage: tryParseJson(message.content.toString("utf8")),
+              });
+
+              return;
+            }
+
+            console.log({ ret });
             await this.processConsumerMessage(
               message,
               channel,
-              consumer,
-              messageHandler,
+              ret?.newOptions ?? consumer,
+              ret?.newCallback ?? messageHandler,
             );
           }),
         ]);
@@ -134,6 +155,8 @@ export class RabbitMQConsumer {
         channel,
         queue: consumer.queue,
       });
+
+      console.log("TERMINOU CALLBACK");
     } catch (e) {
       hasErrors = e;
       hasRetried = await this.processRetry(consumer, message);
@@ -224,14 +247,6 @@ export class RabbitMQConsumer {
   private inspectConsumer(args: InspectInput): void {
     const { binding, consumeMessage, data, error } = args;
 
-    // console.log({
-    //   typeof: typeof Error,
-    //   toString: error.toString(),
-    //   stack: error?.stack,
-    //   message: error?.message,
-    //   name: error?.name,
-    // });
-
     const { exchange, routingKey, queue } = binding;
     const { content, fields, properties } = consumeMessage;
     const message = `[AMQP] [CONSUMER] [${exchange}] [${routingKey}] [${queue}]`;
@@ -274,7 +289,8 @@ export class RabbitMQConsumer {
       return;
     }
 
-    if ((!hasErrors && consumer.autoAck) || (hasErrors && hasRetried)) {
+    console.log({ hasErrors, hasRetried, autoAck: consumer.autoAck });
+    if ((!hasErrors && consumer?.autoAck) || (hasErrors && hasRetried)) {
       channel.ack(message);
     } else if (hasErrors && !hasRetried) {
       let shouldNack = true;
@@ -302,5 +318,36 @@ export class RabbitMQConsumer {
         channel.ack(message);
       }
     }
+  }
+
+  private verify(
+    consumer: RabbitMQConsumerOptions,
+    message: ConsumeMessage,
+    channel: ConfirmChannel,
+  ): { newOptions: RabbitMQConsumerOptions; newCallback: IRabbitHandler } {
+    const isSameExchange = consumer.exchangeName === message.fields.exchange;
+    const isSameRoutingKey = consumer.routingKey === message.fields.routingKey;
+
+    if (!isSameExchange || !isSameRoutingKey) {
+      const newConsumer = AMQPConnectionManager.consumers.get(
+        `${message.fields.exchange}-${message.fields.routingKey}`,
+      );
+
+      if (!newConsumer) {
+        channel.ack(message);
+        throw new Error("Routing key not registered");
+      }
+
+      console.log(
+        `MANDANDO MENSAGEM ${consumer.routingKey} -> ${newConsumer.options.routingKey}`,
+      );
+
+      return {
+        newOptions: { ...newConsumer.options, ...this.defaultConsumerOptions },
+        newCallback: newConsumer.callback,
+      };
+    }
+
+    return { newCallback: null, newOptions: null };
   }
 }
