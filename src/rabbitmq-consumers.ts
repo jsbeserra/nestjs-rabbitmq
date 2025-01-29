@@ -1,6 +1,8 @@
-import { ConsoleLogger, Logger } from "@nestjs/common";
+import { Logger } from "@nestjs/common";
 import { AmqpConnectionManager, ChannelWrapper } from "amqp-connection-manager";
 import { ConfirmChannel, ConsumeMessage } from "amqplib";
+import stringify from "faster-stable-stringify";
+import { AMQPConnectionManager } from "./amqp-connection-manager";
 import { tryParseJson } from "./helper";
 import { IRabbitHandler } from "./rabbitmq.interfaces";
 import {
@@ -8,9 +10,6 @@ import {
   RabbitMQConsumerOptions,
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
-import { AMQPConnectionManager } from "./amqp-connection-manager";
-import stringify from "faster-stable-stringify";
-import { cpSync } from "fs";
 
 type InspectInput = {
   consumeMessage: ConsumeMessage;
@@ -105,30 +104,11 @@ export class RabbitMQConsumer {
           this.attachRetryAndDLQ(channel, consumer),
 
           channel.consume(consumer.queue, async (message) => {
-            let ret: { newOptions; newCallback };
-
-            try {
-              ret = this.verify(consumer, message, channel);
-            } catch (e) {
-              this.logger.warn({
-                logLevel: "warn",
-                binding: {
-                  queue: consumer.queue,
-                  routingKey: message.fields.routingKey,
-                  exchange: consumer.exchangeName,
-                },
-                title: `[AMQP] [ROUTING_KEY_NOT_REGISTERED] [${message.fields.routingKey}]`,
-                consumerMessage: tryParseJson(message.content.toString("utf8")),
-              });
-
-              return;
-            }
-
             await this.processConsumerMessage(
               message,
               channel,
-              ret?.newOptions ?? consumer,
-              ret?.newCallback ?? messageHandler,
+              consumer,
+              messageHandler,
             );
           }),
         ]);
@@ -314,32 +294,5 @@ export class RabbitMQConsumer {
         channel.ack(message);
       }
     }
-  }
-
-  private verify(
-    consumer: RabbitMQConsumerOptions,
-    message: ConsumeMessage,
-    channel: ConfirmChannel,
-  ): { newOptions: RabbitMQConsumerOptions; newCallback: IRabbitHandler } {
-    const isSameExchange = consumer.exchangeName === message.fields.exchange;
-    const isSameRoutingKey = consumer.routingKey === message.fields.routingKey;
-
-    if (!isSameExchange || !isSameRoutingKey) {
-      const newConsumer = AMQPConnectionManager.consumers.get(
-        `${message.fields.exchange}-${message.fields.routingKey}`,
-      );
-
-      if (!newConsumer) {
-        channel.ack(message);
-        throw new Error("Routing key not registered");
-      }
-
-      return {
-        newOptions: { ...newConsumer.options, ...this.defaultConsumerOptions },
-        newCallback: newConsumer.callback,
-      };
-    }
-
-    return { newCallback: null, newOptions: null };
   }
 }

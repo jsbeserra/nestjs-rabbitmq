@@ -13,12 +13,13 @@ import {
 } from "amqp-connection-manager";
 import { ConfirmChannel } from "amqplib";
 import { hostname } from "node:os";
+import { RabbitMQConsumer } from "./rabbitmq-consumers";
+import { IRabbitHandler, RabbitOptionsFactory } from "./rabbitmq.interfaces";
 import {
+  RabbitMQConsumerChannel,
   RabbitMQConsumerOptions,
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
-import { RabbitMQConsumer } from "./rabbitmq-consumers";
-import { IRabbitHandler, RabbitOptionsFactory } from "./rabbitmq.interfaces";
 
 @Injectable()
 export class AMQPConnectionManager
@@ -54,6 +55,7 @@ export class AMQPConnectionManager
       callback: IRabbitHandler;
     }
   > = new Map();
+  private static routingKeyList: string[] = [];
   private connectionBlockedReason: string;
 
   constructor(@Inject("RABBIT_OPTIONS") options: RabbitOptionsFactory) {
@@ -211,23 +213,40 @@ export class AMQPConnectionManager
     const consumerList =
       AMQPConnectionManager.rabbitModuleOptions.consumerChannels ?? [];
 
+    this.checkDuplicatedQueues(consumerList);
+
     for (const consumerEntry of consumerList) {
       const consumer = consumerEntry.options;
 
-      AMQPConnectionManager.consumers.set(
-        `${consumer.exchangeName}-${consumer.routingKey}`,
-        {
-          options: consumer,
-          channel: await new RabbitMQConsumer(
-            AMQPConnectionManager.connection,
-            AMQPConnectionManager.rabbitModuleOptions,
-            AMQPConnectionManager.publishChannelWrapper,
-          ).createConsumer(consumer, consumerEntry.messageHandler),
-          callback: consumerEntry.messageHandler,
-        },
-      );
+      await new RabbitMQConsumer(
+        AMQPConnectionManager.connection,
+        AMQPConnectionManager.rabbitModuleOptions,
+        AMQPConnectionManager.publishChannelWrapper,
+      ).createConsumer(consumer, consumerEntry.messageHandler);
     }
 
     AMQPConnectionManager.isConsumersLoaded = true;
+  }
+
+  private checkDuplicatedQueues(consumerList: RabbitMQConsumerChannel[]): void {
+    const queueNameList = [];
+    consumerList.map((curr) => queueNameList.push(curr.options.queue));
+    const dedupList = new Set(queueNameList);
+
+    if (dedupList.size != queueNameList.length) {
+      this.logger.error({
+        error: "duplicated_queues",
+        description: "Cannot have multiple queues on different binds",
+        queues: Array.from(
+          new Set(
+            queueNameList.filter(
+              (value, index) => queueNameList.indexOf(value) != index,
+            ),
+          ),
+        ),
+      });
+
+      process.exit(-1);
+    }
   }
 }
