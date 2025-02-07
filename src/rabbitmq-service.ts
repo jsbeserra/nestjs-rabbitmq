@@ -46,6 +46,8 @@ export class RabbitMQService {
         {
           correlationId: randomUUID(),
           ...options,
+          persistent: true,
+          deliveryMode: 2,
         },
       );
     } catch (e) {

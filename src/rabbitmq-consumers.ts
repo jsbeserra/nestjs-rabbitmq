@@ -209,6 +209,8 @@ export class RabbitMQConsumer {
                 retriesCount: retryCount + 1,
                 "x-delay": retryDelay,
               },
+              deliveryMode: 2, //persistent message
+              persistent: true,
             },
           );
         } catch (e) {
