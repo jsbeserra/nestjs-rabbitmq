@@ -67,10 +67,7 @@ export class RabbitMQConsumer {
     consumer: RabbitMQConsumerOptions,
     messageHandler: IRabbitHandler,
   ): Promise<ChannelWrapper> {
-    consumer = {
-      ...this.defaultConsumerOptions,
-      ...consumer,
-    };
+    consumer = this.merge(this.defaultConsumerOptions, consumer);
 
     const consumerChannel = this.connection.createChannel({
       confirm: true,
@@ -296,5 +293,15 @@ export class RabbitMQConsumer {
         channel.ack(message);
       }
     }
+  }
+
+  private merge(obj1, obj2) {
+    const merged = { ...obj1 };
+
+    for (const key in obj2) {
+      if (merged[key] === undefined || merged[key] === null)
+        merged[key] = obj2[key];
+    }
+    return merged;
   }
 }
