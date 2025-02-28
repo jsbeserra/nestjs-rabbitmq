@@ -20,6 +20,7 @@ import {
   RabbitMQConsumerOptions,
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
+import { merge } from "./helper";
 
 @Injectable()
 export class AMQPConnectionManager
@@ -62,10 +63,11 @@ export class AMQPConnectionManager
     this.logger =
       options.createRabbitOptions()?.extraOptions?.loggerInstance ??
       new Logger(AMQPConnectionManager.name);
-    AMQPConnectionManager.rabbitModuleOptions = {
-      ...this.defaultOptions,
-      ...options.createRabbitOptions(),
-    };
+
+    AMQPConnectionManager.rabbitModuleOptions = merge(
+      this.defaultOptions,
+      options.createRabbitOptions(),
+    );
   }
 
   async onModuleInit() {

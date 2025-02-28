@@ -1,15 +1,22 @@
 import { Logger } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { AMQPConnectionManager } from "./amqp-connection-manager";
-import { PublishOptions } from "./rabbitmq.types";
+import { LogType, PublishOptions } from "./rabbitmq.types";
 import { RabbitMQConsumer } from "./rabbitmq-consumers";
 import { ChannelWrapper } from "amqp-connection-manager";
 import stringify from "faster-stable-stringify";
 
 export class RabbitMQService {
+  private readonly logType: LogType;
   private logger: Console | Logger =
     AMQPConnectionManager.rabbitModuleOptions?.extraOptions?.loggerInstance ??
     new Logger(RabbitMQService.name);
+
+  constructor() {
+    this.logType =
+      (process.env.RABBITMQ_LOG_TYPE as LogType) ??
+      AMQPConnectionManager.rabbitModuleOptions.extraOptions.logType;
+  }
 
   /**
    * Check status of the main conenection to the broker.
@@ -102,13 +109,7 @@ export class RabbitMQService {
     properties?: PublishOptions,
     error?: any,
   ): void {
-    if (
-      !["publisher", "all"].includes(
-        AMQPConnectionManager.rabbitModuleOptions.extraOptions.logType,
-      ) &&
-      !error
-    )
-      return;
+    if (!["publisher", "all"].includes(this.logType) && !error) return;
 
     const logLevel = error ? "error" : "log";
     const logData = {
