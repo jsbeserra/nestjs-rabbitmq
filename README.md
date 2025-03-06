@@ -57,19 +57,19 @@ expect.
 ### PNPM
 
 ```shell
-pnpm add @nestjs-rabbitmq
+pnpm add @bgaldino/nestjs-rabbitmq
 ```
 
 **YARN**
 
 ```shell
-yarn add @nestjs-rabbitmq
+yarn add @bgaldino/nestjs-rabbitmq
 ```
 
 **NPM**
 
 ```shell
-npm add @nestjs-rabbitmq
+npm add @bgaldino/nestjs-rabbitmq
 ```
 
 ## Getting Started
