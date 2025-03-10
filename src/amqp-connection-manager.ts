@@ -56,18 +56,17 @@ export class AMQPConnectionManager
       callback: IRabbitHandler;
     }
   > = new Map();
-  private static routingKeyList: string[] = [];
   private connectionBlockedReason: string;
 
   constructor(@Inject("RABBIT_OPTIONS") options: RabbitOptionsFactory) {
-    this.logger =
-      options.createRabbitOptions()?.extraOptions?.loggerInstance ??
-      new Logger(AMQPConnectionManager.name);
-
     AMQPConnectionManager.rabbitModuleOptions = merge(
       this.defaultOptions,
       options.createRabbitOptions(),
     );
+
+    this.logger =
+      AMQPConnectionManager.rabbitModuleOptions.extraOptions?.loggerInstance ??
+      new Logger(AMQPConnectionManager.name);
   }
 
   async onModuleInit() {

@@ -1,4 +1,4 @@
-import { Logger } from "@nestjs/common";
+import { Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { AMQPConnectionManager } from "./amqp-connection-manager";
 import { LogType, PublishOptions } from "./rabbitmq.types";
@@ -6,13 +6,13 @@ import { RabbitMQConsumer } from "./rabbitmq-consumers";
 import { ChannelWrapper } from "amqp-connection-manager";
 import stringify from "faster-stable-stringify";
 
-export class RabbitMQService {
-  private readonly logType: LogType;
+export class RabbitMQService implements OnApplicationBootstrap {
+  private logType: LogType;
   private logger: Console | Logger =
     AMQPConnectionManager.rabbitModuleOptions?.extraOptions?.loggerInstance ??
     new Logger(RabbitMQService.name);
 
-  constructor() {
+  onApplicationBootstrap() {
     this.logType =
       (process.env.RABBITMQ_LOG_TYPE as LogType) ??
       AMQPConnectionManager.rabbitModuleOptions.extraOptions.logType;

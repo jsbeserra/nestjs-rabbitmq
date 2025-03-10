@@ -6,12 +6,22 @@ export function tryParseJson(content: string) {
   }
 }
 
-export function merge(obj1, obj2) {
-  const merged = { ...obj1 };
+export function merge(source, target) {
+  const merged = { ...source };
 
-  for (const key in obj2) {
-    if (merged[key] === undefined || merged[key] === null)
-      merged[key] = obj2[key];
+  for (const key in target) {
+    if (target[key] == null) continue;
+
+    if (key in merged) {
+      if (typeof target[key] === "object")
+        merged[key] = merge(source[key], target[key]);
+      else {
+        merged[key] = target[key] ?? source[key];
+      }
+    } else {
+      merged[key] = target[key];
+    }
   }
+
   return merged;
 }
