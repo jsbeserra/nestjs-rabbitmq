@@ -3,7 +3,7 @@ import { AmqpConnectionManager, ChannelWrapper } from "amqp-connection-manager";
 import { ConfirmChannel, ConsumeMessage } from "amqplib";
 import stringify from "faster-stable-stringify";
 import { AMQPConnectionManager } from "./amqp-connection-manager";
-import { tryParseJson } from "./helper";
+import { merge, tryParseJson } from "./helper";
 import { IRabbitHandler } from "./rabbitmq.interfaces";
 import {
   LogType,
@@ -67,7 +67,7 @@ export class RabbitMQConsumer {
     consumer: RabbitMQConsumerOptions,
     messageHandler: IRabbitHandler,
   ): Promise<ChannelWrapper> {
-    consumer = this.merge(this.defaultConsumerOptions, consumer);
+    consumer = merge(this.defaultConsumerOptions, consumer);
 
     const consumerChannel = this.connection.createChannel({
       confirm: true,
@@ -277,7 +277,6 @@ export class RabbitMQConsumer {
           )) ?? true;
       } catch (e) {
         this.logger.error({
-          logLevel: "error",
           title: `[AMQP] [DEADLETTER] ${message.fields.exchange} ${message.fields.routingKey} ${message.fields} ${consumer.queue}`,
           error: {
             stack: e?.stack,
@@ -293,15 +292,5 @@ export class RabbitMQConsumer {
         channel.ack(message);
       }
     }
-  }
-
-  private merge(obj1, obj2) {
-    const merged = { ...obj1 };
-
-    for (const key in obj2) {
-      if (merged[key] === undefined || merged[key] === null)
-        merged[key] = obj2[key];
-    }
-    return merged;
   }
 }

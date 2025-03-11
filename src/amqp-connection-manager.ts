@@ -20,6 +20,7 @@ import {
   RabbitMQConsumerOptions,
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
+import { merge } from "./helper";
 
 @Injectable()
 export class AMQPConnectionManager
@@ -55,17 +56,17 @@ export class AMQPConnectionManager
       callback: IRabbitHandler;
     }
   > = new Map();
-  private static routingKeyList: string[] = [];
   private connectionBlockedReason: string;
 
   constructor(@Inject("RABBIT_OPTIONS") options: RabbitOptionsFactory) {
+    AMQPConnectionManager.rabbitModuleOptions = merge(
+      this.defaultOptions,
+      options.createRabbitOptions(),
+    );
+
     this.logger =
-      options.createRabbitOptions()?.extraOptions?.loggerInstance ??
+      AMQPConnectionManager.rabbitModuleOptions.extraOptions?.loggerInstance ??
       new Logger(AMQPConnectionManager.name);
-    AMQPConnectionManager.rabbitModuleOptions = {
-      ...this.defaultOptions,
-      ...options.createRabbitOptions(),
-    };
   }
 
   async onModuleInit() {
