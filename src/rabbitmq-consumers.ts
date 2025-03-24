@@ -260,7 +260,7 @@ export class RabbitMQConsumer {
     hasErrors: boolean,
     hasRetried: boolean,
   ): Promise<void> {
-    if (!AMQPConnectionManager.connection.isConnected()) {
+    if (!AMQPConnectionManager.consumerConn.isConnected()) {
       this.logger.error("Could not acknowledge message, Connection is offline");
       return;
     }

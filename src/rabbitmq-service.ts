@@ -1,10 +1,11 @@
 import { Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { AMQPConnectionManager } from "./amqp-connection-manager";
-import { LogType, PublishOptions } from "./rabbitmq.types";
+import { LogType } from "./rabbitmq.types";
 import { RabbitMQConsumer } from "./rabbitmq-consumers";
 import { ChannelWrapper } from "amqp-connection-manager";
 import stringify from "faster-stable-stringify";
+import { PublishOptions } from "amqp-connection-manager/dist/types/ChannelWrapper";
 
 export class RabbitMQService implements OnApplicationBootstrap {
   private logType: LogType;
@@ -23,7 +24,10 @@ export class RabbitMQService implements OnApplicationBootstrap {
    * @returns {number} 1 - Online | 0 - Offline
    */
   public checkHealth(): number {
-    return AMQPConnectionManager.connection.isConnected() ? 1 : 0;
+    return AMQPConnectionManager.consumerConn.isConnected() &&
+      AMQPConnectionManager.publisherConn.isConnected()
+      ? 1
+      : 0;
   }
 
   /**
@@ -52,6 +56,9 @@ export class RabbitMQService implements OnApplicationBootstrap {
         stringify(message),
         {
           correlationId: randomUUID(),
+          headers: {
+            publishedAt: Date.now(),
+          },
           ...options,
           persistent: true,
           deliveryMode: 2,
@@ -88,7 +95,7 @@ export class RabbitMQService implements OnApplicationBootstrap {
       const consumerOptions = consumerEntry.options;
 
       const consumer = await new RabbitMQConsumer(
-        AMQPConnectionManager.connection,
+        AMQPConnectionManager.consumerConn,
         AMQPConnectionManager.rabbitModuleOptions,
         AMQPConnectionManager.publishChannelWrapper,
       ).createConsumer(consumerOptions, consumerEntry.messageHandler);
