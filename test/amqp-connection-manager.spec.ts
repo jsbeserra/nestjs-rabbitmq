@@ -135,7 +135,12 @@ describe("AMQPConnectionManager", () => {
           correlationId: "123",
           deliveryMode: 2,
           persistent: true,
-          headers: { publishedAt: expect.any(Number) },
+          headers: {
+            "application-headers": {
+              "published-at": expect.any(Number),
+              "original-routing-key": TestConsumers[0].routingKey,
+            },
+          },
         },
       );
 

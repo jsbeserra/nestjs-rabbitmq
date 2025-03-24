@@ -189,7 +189,7 @@ export class RabbitMQConsumer {
       consumer.retryStrategy.enabled === undefined ||
       consumer?.retryStrategy.enabled
     ) {
-      const retryCount = message.properties?.headers?.["retriesCount"] ?? 0;
+      const retryCount = message.properties?.headers?.["retries-count"] ?? 0;
       const maxRetry = consumer.retryStrategy.maxAttempts;
 
       if (retryCount < maxRetry) {
@@ -203,7 +203,7 @@ export class RabbitMQConsumer {
             {
               headers: {
                 ...message.properties.headers,
-                retriesCount: retryCount + 1,
+                "retries-count": retryCount + 1,
                 "x-delay": retryDelay,
               },
               deliveryMode: 2, //persistent message

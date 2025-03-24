@@ -57,7 +57,10 @@ export class RabbitMQService implements OnApplicationBootstrap {
         {
           correlationId: randomUUID(),
           headers: {
-            publishedAt: Date.now(),
+            "application-headers": {
+              "original-routing-key": routingKey,
+              "published-at": Date.now(),
+            },
           },
           ...options,
           persistent: true,
