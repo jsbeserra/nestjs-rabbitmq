@@ -112,7 +112,7 @@ describe("AMQPConnectionManager", () => {
         "publish",
       );
 
-      // const loggerSpy = jest.spyOn(Logger.prototype, "log");
+      const loggerSpy = jest.spyOn(Logger.prototype, "log");
 
       jest
         .spyOn(RmqTestService.prototype, "messageHandler")
@@ -136,8 +136,8 @@ describe("AMQPConnectionManager", () => {
           deliveryMode: 2,
           persistent: true,
           headers: {
-            "application-headers": {
-              "published-at": expect.any(Number),
+            "x-application-headers": {
+              "published-at": expect.any(String),
               "original-routing-key": TestConsumers[0].routingKey,
             },
           },
@@ -146,22 +146,21 @@ describe("AMQPConnectionManager", () => {
 
       expect(isPublished).toBeTruthy();
 
-      //TODO: Fix mock getting wrong call
-      // expect(JSON.parse(loggerSpy.mock.lastCall?.[0])).toMatchObject(
-      //   expect.objectContaining({
-      //     logLevel: "log",
-      //     title: `[AMQP] [PUBLISH] [${TestConsumers[0].exchangeName}] [${TestConsumers[0].routingKey}]`,
-      //     binding: {
-      //       routingKey: TestConsumers[0].routingKey,
-      //       exchange: TestConsumers[0].exchangeName,
-      //     },
-      //     correlationId: "123",
-      //     consumedMessage: {
-      //       content: { test: "published" },
-      //       properties: { correlationId: "123" },
-      //     },
-      //   }),
-      // );
+      expect(loggerSpy.mock.lastCall?.[0]).toMatchObject(
+        expect.objectContaining({
+          logLevel: "log",
+          title: `[AMQP] [PUBLISH] [${TestConsumers[0].exchangeName}] [${TestConsumers[0].routingKey}]`,
+          binding: {
+            routingKey: TestConsumers[0].routingKey,
+            exchange: TestConsumers[0].exchangeName,
+          },
+          correlationId: "123",
+          publishedMessage: {
+            content: { test: "published" },
+            properties: { correlationId: "123" },
+          },
+        }),
+      );
     });
   });
 
