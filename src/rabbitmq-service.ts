@@ -1,4 +1,4 @@
-import { Logger, OnApplicationBootstrap } from "@nestjs/common";
+import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { AMQPConnectionManager } from "./amqp-connection-manager";
 import { LogType } from "./rabbitmq.types";
@@ -7,6 +7,7 @@ import { ChannelWrapper } from "amqp-connection-manager";
 import stringify from "faster-stable-stringify";
 import { PublishOptions } from "amqp-connection-manager/dist/types/ChannelWrapper";
 
+@Injectable()
 export class RabbitMQService implements OnApplicationBootstrap {
   private logType: LogType;
   private logger: Console | Logger =
@@ -125,6 +126,7 @@ export class RabbitMQService implements OnApplicationBootstrap {
     const logLevel = error ? "error" : "log";
     const logData = {
       logLevel,
+      type: "publisher",
       duration: elapsedTime.toString(),
       correlationId: properties?.correlationId,
       title: `[AMQP] [PUBLISH] [${exchange}] [${routingKey}]`,
@@ -136,8 +138,6 @@ export class RabbitMQService implements OnApplicationBootstrap {
     };
 
     if (error) logData["error"] = error;
-
-    //TODO: Check if I need stringify
     this.logger[logLevel](logData);
   }
 }

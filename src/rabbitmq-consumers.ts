@@ -230,6 +230,7 @@ export class RabbitMQConsumer {
 
     const logData = {
       logLevel,
+      type: "consumer",
       duration: args.elapsedTime.toString(),
       correlationId: args?.consumeMessage?.properties?.correlationId,
       binding,
@@ -277,6 +278,7 @@ export class RabbitMQConsumer {
           )) ?? true;
       } catch (e) {
         this.logger.error({
+          type: "consumer",
           title: `[AMQP] [DEADLETTER] ${message.fields.exchange} ${message.fields.routingKey} ${message.fields} ${consumer.queue}`,
           error: {
             stack: e?.stack,
