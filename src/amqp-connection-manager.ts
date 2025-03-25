@@ -99,7 +99,7 @@ export class AMQPConnectionManager
         keepAliveDelay: 5000,
         servername: hostname(),
         clientProperties: {
-          connection_name: `${process.env.npm_package_name}-${hostname()}-consumer`,
+          connection_name: `${process.env?.npm_package_name ?? process.env.SERVICE_NAME}-${hostname()}-consumer`,
         },
       },
     };
