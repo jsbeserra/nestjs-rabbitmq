@@ -58,6 +58,7 @@ export class RabbitMQService implements OnApplicationBootstrap {
           correlationId: randomUUID(),
           headers: {
             "x-application-headers": {
+              "original-exchange": exchangeName,
               "original-routing-key": routingKey,
               "published-at": new Date().toISOString(),
             },

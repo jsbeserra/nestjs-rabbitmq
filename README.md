@@ -16,6 +16,7 @@
     - [The configuration file](#the-configuration-file)
   - [Publishers](#publishers)
     - [Publishing messages](#publishing-messages)
+    - [Custom headers](#custom-headers)
   - [Consumers](#consumers)
     - [The messageHandler callback](#the-messagehandler-callback)
     - [Strongly typed consumer](#strongly-typed-consumer)
@@ -23,6 +24,7 @@
   - [Retrying strategy](#retrying-strategy)
   - [Deadletter strategy](#deadletter-strategy)
   - [Disabling the automatic ack](#disabling-the-automatic-ack)
+  - [Custom Header metadata](#custom-header-metadata)
   - [Extra options](#extra-options)
     - [Consumer manual loading](#consumer-manual-loading)
     - [Message inspection and logging](#message-inspection-and-logging)
@@ -170,6 +172,10 @@ async publishMeTyped() {
 The `publish()` method uses [Publish Confirms](https://www.rabbitmq.com/docs/confirms#publisher-confirms)
 to make sure that the message is delivered to the broker before returning
 the promise.
+
+### Custom headers
+
+The library defines a couple custom headers
 
 ## Consumers
 
@@ -399,6 +405,23 @@ async messageHandler(
  params.channel.ack(params.message);
 }
 ```
+
+## Custom Header metadata
+
+Every published message contains the following custom header:
+
+```json
+{
+  "x-application-headers": {
+    "original-exchange": String,
+    "original-routing-key": String,
+    "published-at": ISODate
+  }
+}
+```
+
+This is important because when sending the message to the DLQ, the original
+routing-key and exchange references are lost.
 
 ## Extra options
 

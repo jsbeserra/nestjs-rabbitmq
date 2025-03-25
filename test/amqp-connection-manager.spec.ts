@@ -137,8 +137,9 @@ describe("AMQPConnectionManager", () => {
           persistent: true,
           headers: {
             "x-application-headers": {
-              "published-at": expect.any(String),
+              "original-exchange": TestConsumers[0].exchangeName,
               "original-routing-key": TestConsumers[0].routingKey,
+              "published-at": expect.any(String),
             },
           },
         },
