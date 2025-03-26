@@ -111,7 +111,9 @@ describe("AMQPConnectionManager", () => {
         AMQPConnectionManager.publishChannelWrapper,
         "publish",
       );
+
       const loggerSpy = jest.spyOn(Logger.prototype, "log");
+
       jest
         .spyOn(RmqTestService.prototype, "messageHandler")
         .mockImplementation(async () => {});
@@ -129,36 +131,44 @@ describe("AMQPConnectionManager", () => {
         TestConsumers[0].exchangeName,
         TestConsumers[0].queue,
         JSON.stringify({ test: "published" }),
-        { correlationId: "123" },
+        {
+          correlationId: "123",
+          deliveryMode: 2,
+          persistent: true,
+          headers: {
+            "x-application-headers": {
+              "original-exchange": TestConsumers[0].exchangeName,
+              "original-routing-key": TestConsumers[0].routingKey,
+              "published-at": expect.any(String),
+            },
+          },
+        },
       );
 
       expect(isPublished).toBeTruthy();
 
-      //TODO: Fix mock getting wrong call
-      // expect(JSON.parse(loggerSpy.mock.lastCall?.[0])).toMatchObject(
-      //   expect.objectContaining({
-      //     logLevel: "log",
-      //     title: `[AMQP] [PUBLISH] [${TestConsumers[0].exchangeName}] [${TestConsumers[0].routingKey}]`,
-      //     binding: {
-      //       routingKey: TestConsumers[0].routingKey,
-      //       exchange: TestConsumers[0].exchangeName,
-      //     },
-      //     correlationId: "123",
-      //     consumedMessage: {
-      //       content: { test: "published" },
-      //       properties: { correlationId: "123" },
-      //     },
-      //   }),
-      // );
+      expect(loggerSpy.mock.lastCall?.[0]).toMatchObject(
+        expect.objectContaining({
+          logLevel: "log",
+          title: `[AMQP] [PUBLISH] [${TestConsumers[0].exchangeName}] [${TestConsumers[0].routingKey}]`,
+          binding: {
+            routingKey: TestConsumers[0].routingKey,
+            exchange: TestConsumers[0].exchangeName,
+          },
+          correlationId: "123",
+          publishedMessage: {
+            content: { test: "published" },
+            properties: { correlationId: "123" },
+          },
+        }),
+      );
     });
   });
 
   describe("Consumer", () => {
     it("should have one channel for each consumer", async () => {
       expect(amqpManager.getConsumers().length).toEqual(TestConsumers.length);
-
-      // Remove 1 channel because it is the publisher
-      expect(AMQPConnectionManager.connection.channelCount - 1).toEqual(
+      expect(amqpManager.getConnection("consumer").channelCount).toEqual(
         TestConsumers.length,
       );
     });
@@ -252,7 +262,8 @@ describe("AMQPConnectionManager", () => {
 
       expect(retrySpy).toHaveBeenCalled();
       expect(loggerSpy).toHaveBeenCalled();
-      expect(JSON.parse(loggerSpy.mock.lastCall?.[0])).toMatchObject(
+
+      expect(loggerSpy.mock.lastCall?.[0]).toMatchObject(
         expect.objectContaining({
           logLevel: "error",
           title: `[AMQP] [CONSUMER] [${TestConsumers[1].exchangeName}] [${TestConsumers[1].routingKey}] [${TestConsumers[1].queue}]`,
@@ -261,7 +272,7 @@ describe("AMQPConnectionManager", () => {
             routingKey: TestConsumers[1].routingKey,
             exchange: TestConsumers[1].exchangeName,
           },
-          error: "throw_test",
+          error: expect.objectContaining({ message: "throw_test" }),
         }),
       );
     });

@@ -189,7 +189,7 @@ export class RabbitMQConsumer {
       consumer.retryStrategy.enabled === undefined ||
       consumer?.retryStrategy.enabled
     ) {
-      const retryCount = message.properties?.headers?.["retriesCount"] ?? 0;
+      const retryCount = message.properties?.headers?.["x-retries-count"] ?? 0;
       const maxRetry = consumer.retryStrategy.maxAttempts;
 
       if (retryCount < maxRetry) {
@@ -203,7 +203,7 @@ export class RabbitMQConsumer {
             {
               headers: {
                 ...message.properties.headers,
-                retriesCount: retryCount + 1,
+                "x-retries-count": retryCount + 1,
                 "x-delay": retryDelay,
               },
               deliveryMode: 2, //persistent message
@@ -230,6 +230,7 @@ export class RabbitMQConsumer {
 
     const logData = {
       logLevel,
+      type: "consumer",
       duration: args.elapsedTime.toString(),
       correlationId: args?.consumeMessage?.properties?.correlationId,
       binding,
@@ -260,7 +261,7 @@ export class RabbitMQConsumer {
     hasErrors: boolean,
     hasRetried: boolean,
   ): Promise<void> {
-    if (!AMQPConnectionManager.connection.isConnected()) {
+    if (!AMQPConnectionManager.consumerConn.isConnected()) {
       this.logger.error("Could not acknowledge message, Connection is offline");
       return;
     }
@@ -277,6 +278,7 @@ export class RabbitMQConsumer {
           )) ?? true;
       } catch (e) {
         this.logger.error({
+          type: "consumer",
           title: `[AMQP] [DEADLETTER] ${message.fields.exchange} ${message.fields.routingKey} ${message.fields} ${consumer.queue}`,
           error: {
             stack: e?.stack,

@@ -14,10 +14,10 @@ import {
 import { ConfirmChannel } from "amqplib";
 import { hostname } from "node:os";
 import { RabbitMQConsumer } from "./rabbitmq-consumers";
-import { IRabbitHandler, RabbitOptionsFactory } from "./rabbitmq.interfaces";
+import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
 import {
+  ConnectionType,
   RabbitMQConsumerChannel,
-  RabbitMQConsumerOptions,
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
 import { merge } from "./helper";
@@ -39,24 +39,17 @@ export class AMQPConnectionManager
     extraOptions: {
       logType: "none",
       consumerManualLoad: false,
-      heartbeatIntervalInSeconds: 5,
+      heartbeatIntervalInSeconds: 0,
       reconnectTimeInSeconds: 5,
     },
   };
   public static rabbitModuleOptions: RabbitMQModuleOptions;
   public static publishChannelWrapper: ChannelWrapper = null;
-  public static connection: AmqpConnectionManager;
+  public static consumerConn: AmqpConnectionManager;
+  public static publisherConn: AmqpConnectionManager;
   public static isConsumersLoaded: boolean = false;
-  public static errorMessage = null;
-  public static consumers: Map<
-    string,
-    {
-      options: RabbitMQConsumerOptions;
-      channel: ChannelWrapper;
-      callback: IRabbitHandler;
-    }
-  > = new Map();
   private connectionBlockedReason: string;
+  private consumers: ChannelWrapper[] = [];
 
   constructor(@Inject("RABBIT_OPTIONS") options: RabbitOptionsFactory) {
     AMQPConnectionManager.rabbitModuleOptions = merge(
@@ -85,41 +78,73 @@ export class AMQPConnectionManager
 
   async onApplicationShutdown() {
     this.logger.log("Closing RabbitMQ Connection");
-    await AMQPConnectionManager?.connection?.close();
+    await AMQPConnectionManager?.consumerConn?.close();
+    await AMQPConnectionManager?.publisherConn?.close();
+  }
+
+  public getConsumers() {
+    return this.consumers;
   }
 
   private async connect() {
+    const params = {
+      heartbeatIntervalInSeconds:
+        AMQPConnectionManager.rabbitModuleOptions.extraOptions
+          .heartbeatIntervalInSeconds,
+      reconnectTimeInSeconds:
+        AMQPConnectionManager.rabbitModuleOptions.extraOptions
+          .reconnectTimeInSeconds,
+      connectionOptions: {
+        keepAlive: true,
+        keepAliveDelay: 5000,
+        servername: hostname(),
+        clientProperties: {
+          connection_name: `${process.env?.npm_package_name ?? process.env.SERVICE_NAME}-${hostname()}-consumer`,
+        },
+      },
+    };
+
     await new Promise((resolve) => {
-      AMQPConnectionManager.connection = connect(
+      AMQPConnectionManager.consumerConn = connect(
         AMQPConnectionManager.rabbitModuleOptions.connectionString,
         {
-          heartbeatIntervalInSeconds:
-            AMQPConnectionManager.rabbitModuleOptions.extraOptions
-              .heartbeatIntervalInSeconds,
-          reconnectTimeInSeconds:
-            AMQPConnectionManager.rabbitModuleOptions.extraOptions
-              .reconnectTimeInSeconds,
+          ...params,
           connectionOptions: {
-            keepAlive: true,
-            keepAliveDelay: 5000,
-            servername: hostname(),
             clientProperties: {
-              connection_name: `${process.env.npm_package_name}-${hostname()}`,
+              connection_name: `${process.env?.npm_package_name ?? process.env.SERVICE_NAME}-${hostname()}-consumer`,
             },
           },
         },
       );
 
-      this.attachEvents(resolve);
+      this.attachEvents("consumer", resolve);
+    });
+
+    await new Promise((resolve) => {
+      AMQPConnectionManager.publisherConn = connect(
+        AMQPConnectionManager.rabbitModuleOptions.connectionString,
+        {
+          ...params,
+          connectionOptions: {
+            clientProperties: {
+              connection_name: `${process.env?.npm_package_name ?? process.env.SERVICE_NAME}-${hostname()}-publisher`,
+            },
+          },
+        },
+      );
+
+      this.attachEvents("publisher", resolve);
     });
 
     await this.assertExchanges();
   }
 
-  private attachEvents(resolve: any) {
-    this.getConnection().on("connect", async ({ url }: { url: string }) => {
+  private attachEvents(type: ConnectionType, resolve: any) {
+    const conn = this.getConnection(type);
+
+    conn.on("connect", async ({ url }: { url: string }) => {
       this.logger.log(
-        `Rabbit connected to ${url.replace(
+        `Rabbit ${type} connected to ${url.replace(
           new RegExp(url.replace(/amqp:\/\/[^:]*:([^@]*)@.*?$/i, "$1"), "g"),
           "***",
         )}`,
@@ -127,7 +152,7 @@ export class AMQPConnectionManager
       resolve(true);
     });
 
-    this.getConnection().on("disconnect", ({ err }) => {
+    conn.on("disconnect", ({ err }) => {
       this.logger.warn(`Disconnected from rabbitmq: ${err.message}`);
 
       if (
@@ -135,7 +160,7 @@ export class AMQPConnectionManager
           err.message.toLowerCase().includes(errorMessage),
         )
       ) {
-        this.getConnection().close();
+        conn.close();
 
         this.logger.error({
           message: `RabbitMQ Disconnected with a terminal error, impossible to reconnect `,
@@ -145,36 +170,43 @@ export class AMQPConnectionManager
       }
     });
 
-    this.getConnection().on("connectFailed", ({ err }) => {
+    conn.on("connectFailed", ({ err }) => {
       this.logger.error(
         `Failure to connect to RabbitMQ instance: ${err.message}`,
       );
     });
 
-    this.getConnection().on("blocked", ({ reason }) => {
-      this.logger.error(`RabbitMQ broker is blocked with reason: ${reason}`);
-      this.connectionBlockedReason = reason;
-    });
+    if (type === "publisher") {
+      conn.on("blocked", ({ reason }) => {
+        this.logger.error(`RabbitMQ broker is blocked with reason: ${reason}`);
+        this.connectionBlockedReason = reason;
+      });
 
-    this.getConnection().on("unblocked", () => {
-      this.logger.error(
-        `RabbitMQ broker connection is unblocked, last reason was: ${this.connectionBlockedReason}`,
-      );
-    });
+      conn.on("unblocked", () => {
+        this.logger.error(
+          `RabbitMQ broker connection is unblocked, last reason was: ${this.connectionBlockedReason}`,
+        );
+      });
+    }
   }
 
-  private getConnection() {
-    return AMQPConnectionManager.connection;
+  public getConnection(type: ConnectionType) {
+    if (type === "publisher") {
+      return AMQPConnectionManager.publisherConn;
+    } else {
+      return AMQPConnectionManager.consumerConn;
+    }
   }
 
   private async assertExchanges(): Promise<void> {
     await new Promise((resolve) => {
-      AMQPConnectionManager.publishChannelWrapper =
-        this.getConnection().createChannel({
-          name: `${process.env.npm_package_name}_publish`,
-          confirm: true,
-          publishTimeout: 60000,
-        });
+      AMQPConnectionManager.publishChannelWrapper = this.getConnection(
+        "publisher",
+      ).createChannel({
+        name: `${process.env.npm_package_name}_publish`,
+        confirm: true,
+        publishTimeout: 60000,
+      });
 
       AMQPConnectionManager.publishChannelWrapper.on("connect", () => {
         this.logger.debug("Initiating RabbitMQ producers");
@@ -219,11 +251,13 @@ export class AMQPConnectionManager
     for (const consumerEntry of consumerList) {
       const consumer = consumerEntry.options;
 
-      await new RabbitMQConsumer(
-        AMQPConnectionManager.connection,
-        AMQPConnectionManager.rabbitModuleOptions,
-        AMQPConnectionManager.publishChannelWrapper,
-      ).createConsumer(consumer, consumerEntry.messageHandler);
+      this.consumers.push(
+        await new RabbitMQConsumer(
+          AMQPConnectionManager.consumerConn,
+          AMQPConnectionManager.rabbitModuleOptions,
+          AMQPConnectionManager.publishChannelWrapper,
+        ).createConsumer(consumer, consumerEntry.messageHandler),
+      );
     }
 
     AMQPConnectionManager.isConsumersLoaded = true;
