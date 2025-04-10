@@ -82,8 +82,53 @@ export class RabbitMQService implements OnApplicationBootstrap {
         hasErrors,
       );
     }
-
     return !hasErrors;
+  }
+  /**
+   * Publishes an array of messages to the broker.
+   * @param {string} exchangeName - Name of the exchange
+   * @param {string} routingKey - Routing key for publishing
+   * @param {T[]} messages - Array of messages that will be published to RabbitMQ. All messages will be transformed into JSON.
+   * @param {number} batchSize - The number of messages sent per batch,This value is used to avoid sending an excessively high number of messages at once.
+   * **Default:** `100`
+   * @param {PublishOptions} options - Any custom options you want to send with the message, such as headers or properties.
+   * @returns {Promise<T[]>} Returns a confirmation promise.
+   * If **empty**, it means all messages were successfully delivered to an exchange or queue.
+   * If **contains items**, it means they **were not published**!
+   */
+  async publishBulk<T>(
+    exchangeName: string,
+    routingKey: string,
+    messages: T[],
+    options?: PublishOptions,
+    batchSize: number = 100,
+  ): Promise<T[]> {
+    const faileds: T[] = [];
+    for (let i = 0; i < messages.length; i += batchSize) {
+      const chunk = messages.slice(i, i + batchSize);
+      const publisheds = await Promise.allSettled(
+        chunk.map(async (message: T): Promise<{ message: T } | boolean> => {
+          const published = await this.publish(
+            exchangeName,
+            routingKey,
+            message,
+            options,
+          );
+          if (published) return true;
+          return { message };
+        }),
+      );
+      for (const result of publisheds) {
+        if (result.status === "fulfilled" && result.value instanceof Object) {
+          faileds.push(result.value.message);
+        }
+      }
+      if (this.checkHealth() === 0) {
+        faileds.push(...messages.slice(i + batchSize));
+        break;
+      }
+    }
+    return faileds;
   }
 
   async createConsumers(): Promise<ChannelWrapper[]> {
