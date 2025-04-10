@@ -73,10 +73,10 @@ describe("AMQPConnectionManager", () => {
     await moduleRef.close();
   });
 
-  afterEach(()=>{
+  afterEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
-  })
+  });
 
   it("should return a truthy connection health", async () => {
     expect(testService.rabbitService.checkHealth()).toBeTruthy();
@@ -187,7 +187,12 @@ describe("AMQPConnectionManager", () => {
       const isPublished = await rabbitMqService.publishBulk(
         TestConsumers[0].exchangeName,
         TestConsumers[0].routingKey as string,
-        [{ test: "published" },{ test: "published" },{ test: "published" },{ test: "published" }],
+        [
+          { test: "published" },
+          { test: "published" },
+          { test: "published" },
+          { test: "published" },
+        ],
         { correlationId: "123" },
       );
 
@@ -236,7 +241,9 @@ describe("AMQPConnectionManager", () => {
         "publish",
       );
       jest
-      .spyOn(rabbitMqService,"publish").mockResolvedValueOnce(false).mockResolvedValue(true)
+        .spyOn(rabbitMqService, "publish")
+        .mockResolvedValueOnce(false)
+        .mockResolvedValue(true);
       jest
         .spyOn(RmqTestService.prototype, "messageHandler")
         .mockImplementation(async () => {});
@@ -244,23 +251,26 @@ describe("AMQPConnectionManager", () => {
       const publisheds = await rabbitMqService.publishBulk<any>(
         TestConsumers[0].exchangeName,
         TestConsumers[0].routingKey as string,
-        [{ test: "failed" },{ test: "published" },{ test: "published" },{ test: "published" }],
+        [
+          { test: "failed" },
+          { test: "published" },
+          { test: "published" },
+          { test: "published" },
+        ],
         { correlationId: "123" },
       );
 
-      expect(publisheds.length).toBe(1)
-      expect(publisheds[0].test).toBe("failed")
+      expect(publisheds.length).toBe(1);
+      expect(publisheds[0].test).toBe("failed");
     });
 
     it("should return messages that failed to publish if the connection to rabbitmq is lost", async () => {
-      const rabbitPublish = jest.spyOn(
-        AMQPConnectionManager.publishChannelWrapper,
-        "publish",
-      );
+      jest.spyOn(AMQPConnectionManager.publishChannelWrapper, "publish");
+      jest.spyOn(rabbitMqService, "publish").mockResolvedValue(true);
       jest
-      .spyOn(rabbitMqService,"publish").mockResolvedValue(true)
-      jest
-      .spyOn(rabbitMqService,"checkHealth").mockReturnValueOnce(1).mockReturnValue(0)
+        .spyOn(rabbitMqService, "checkHealth")
+        .mockReturnValueOnce(1)
+        .mockReturnValue(0);
       jest
         .spyOn(RmqTestService.prototype, "messageHandler")
         .mockImplementation(async () => {});
@@ -268,12 +278,16 @@ describe("AMQPConnectionManager", () => {
       const publisheds = await rabbitMqService.publishBulk<any>(
         TestConsumers[0].exchangeName,
         TestConsumers[0].routingKey as string,
-        [{ test: "failed" },{ test: "published" },{ test: "published" },{ test: "published" }],
-        { correlationId: "123" },
-        1
+        [
+          { test: "failed" },
+          { test: "published" },
+          { test: "published" },
+          { test: "published" },
+        ],
+        { correlationId: "123", batchSize: 1 },
       );
 
-      expect(publisheds.length).toBe(2)
+      expect(publisheds.length).toBe(2);
     });
   });
 
