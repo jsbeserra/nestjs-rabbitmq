@@ -27,15 +27,9 @@ describe("AMQPConnectionManager", () => {
   let amqpManager: AMQPConnectionManager;
   let testService: RmqTestService;
   let moduleRef: TestingModule;
-  let globalConsumerCallbackSpy: any;
   let globalConsumerThrowSpy: any;
 
   beforeAll(async () => {
-    globalConsumerCallbackSpy = jest.spyOn(
-      RmqTestService.prototype,
-      "messageHandler",
-    );
-
     globalConsumerThrowSpy = jest.spyOn(
       RmqTestService.prototype,
       "throwHandler",
@@ -236,10 +230,7 @@ describe("AMQPConnectionManager", () => {
     });
 
     it("should publish an array of messages and return 1 failed message", async () => {
-      const rabbitPublish = jest.spyOn(
-        AMQPConnectionManager.publishChannelWrapper,
-        "publish",
-      );
+      jest.spyOn(AMQPConnectionManager.publishChannelWrapper, "publish");
       jest
         .spyOn(rabbitMqService, "publish")
         .mockResolvedValueOnce(false)
