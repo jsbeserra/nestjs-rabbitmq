@@ -6,6 +6,7 @@ import { RabbitMQConsumer } from "./rabbitmq-consumers";
 import { ChannelWrapper } from "amqp-connection-manager";
 import stringify from "faster-stable-stringify";
 import { PublishOptions } from "amqp-connection-manager/dist/types/ChannelWrapper";
+import { merge } from "./helper";
 
 @Injectable()
 export class RabbitMQService implements OnApplicationBootstrap {
@@ -49,25 +50,25 @@ export class RabbitMQService implements OnApplicationBootstrap {
   ): Promise<boolean> {
     let hasErrors = null;
     const start = process.hrtime.bigint();
+    const defaultHeaders = {
+      correlationId: randomUUID(),
+      headers: {
+        "x-application-headers": {
+          "original-exchange": exchangeName,
+          "original-routing-key": routingKey,
+          "published-at": new Date().toISOString(),
+        },
+      },
+      persistent: true,
+      deliveryMode: 2,
+    };
 
     try {
       await AMQPConnectionManager.publishChannelWrapper.publish(
         exchangeName,
         routingKey,
         stringify(message),
-        {
-          correlationId: randomUUID(),
-          headers: {
-            "x-application-headers": {
-              "original-exchange": exchangeName,
-              "original-routing-key": routingKey,
-              "published-at": new Date().toISOString(),
-            },
-          },
-          ...options,
-          persistent: true,
-          deliveryMode: 2,
-        },
+        merge(defaultHeaders, options),
       );
     } catch (e) {
       hasErrors = e;

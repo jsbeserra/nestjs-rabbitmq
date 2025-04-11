@@ -65,7 +65,7 @@ export type RabbitMQConsumerOptions = {
 
   deadLetterStrategy?: {
     /** Callback that will be executed before sending the message to the DLQ
-     * This handler will follow the `IRabbitDeadletterCallback` _interface and expects
+     * This handler will follow the `IRabbitDeadletterCallback` interface and expects
      * the return of a boolean_. If the return is `TRUE`, it will send the message
      * to the DLQ right after, otherwise, it will skip sending it
      * @example messageHandler: this.yourService.deadLetterFunction.bind(this.yourService)
