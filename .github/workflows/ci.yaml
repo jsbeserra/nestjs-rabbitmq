@@ -1,9 +1,8 @@
 name: nestjs-rabbitmq
 on:
-  [push]
-  # pull_request:
-  #   branches:
-  #     - feat/publish-bulk
+  pull_request:
+    branches:
+      - main
 jobs:
   check-application:
     runs-on: ubuntu-latest
@@ -29,12 +28,12 @@ jobs:
       - name: Install depencencies
         run: pnpm i
 
-      - name: Esperar o RabbitMQ subir
+      - name: Wait for RabbitMQ to go up
         run: |
-          echo "Aguardando RabbitMQ..."
+          echo "Waiting RabbitMQ..."
           for i in {1..10}; do
             nc -z localhost 5672 && echo "RabbitMQ OK" && break
-            echo "Aguardando..."
+            echo "Waiting..."
             sleep 5
           done
 
