@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       rabbitmq:
-        image: heidiks/rabbitmq-delayed-message-exchange:latest
+        image: heidiks/rabbitmq-delayed-message-exchange:4.0.2-management
         ports:
           - 5672:5672
           - 15672:15672
