@@ -107,21 +107,19 @@ export class RabbitMQService implements OnApplicationBootstrap {
     for (let i = 0; i < messages.length; i += batchSize) {
       const chunk = messages.slice(i, i + batchSize);
       const publisheds = await Promise.allSettled(
-        chunk.map(async (message: T): Promise<{ message: T } | boolean> => {
+        chunk.map(async (message: T): Promise<T | void> => {
           const published = await this.publish(
             exchangeName,
             routingKey,
             message,
             options,
           );
-          if (published) return true;
-          return { message };
+          if (published) return Promise.resolve();
+          return Promise.reject({message});
         }),
       );
       for (const result of publisheds) {
-        if (result.status === "fulfilled" && result.value instanceof Object) {
-          faileds.push(result.value.message);
-        }
+        if (result.status === "rejected") faileds.push(result.reason.message)
       }
       if (this.checkHealth() === 0) {
         faileds.push(...messages.slice(i + batchSize));
