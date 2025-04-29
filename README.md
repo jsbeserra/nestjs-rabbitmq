@@ -1,3 +1,7 @@
+
+# This is a testing version, if you want to use this lib, use the main repository, or download it directly from npm 
+
+
 # @bgaldino/nestjs-rabbitmq
 
 # Table of Contents
