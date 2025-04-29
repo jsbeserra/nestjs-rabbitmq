@@ -16,14 +16,14 @@
   "scripts": {
     "test": "NODE_ENV=develop node --expose-gc ./node_modules/jest/bin/jest.js --config ./test/jest.config.json --runInBand --logHeapUsage --coverage",
     "build": "rimraf dist && tsc",
-    "prepublish": "pnpm run build",
-    "test:ci": "NODE_ENV=develop node --expose-gc ./node_modules/jest/bin/jest.js --config ./test/jest.config.json"
+    "prepublish": "pnpm run build"
   },
   "dependencies": {
     "@types/amqplib": "^0.10.6",
     "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.3",
     "faster-stable-stringify": "^1.0.0",
+    "jest-mock-extended": "3.0.7",
     "reflect-metadata": "^0.2.1",
     "rimraf": "^5.0.5",
     "rxjs": "^7.8.1"
