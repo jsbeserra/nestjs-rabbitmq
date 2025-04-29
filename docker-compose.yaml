@@ -15,6 +15,11 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     mem_limit: 512m
     cpus: 0.2
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - default
 
