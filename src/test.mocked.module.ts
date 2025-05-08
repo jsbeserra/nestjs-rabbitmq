@@ -1,7 +1,7 @@
 import { DynamicModule, Module, Type } from "@nestjs/common";
 import { mock } from "jest-mock-extended";
 import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
-import { AMQPConnectionManager } from "./amqp-connection-manager";
+import { AMQPConnectionManager } from "./manager/amqp-connection-manager";
 import { RabbitMQService } from "./rabbitmq-service";
 
 export type RabbitOptions = {

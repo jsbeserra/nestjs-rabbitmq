@@ -11,16 +11,15 @@ import {
   ChannelWrapper,
   connect,
 } from "amqp-connection-manager";
-import { ConfirmChannel } from "amqplib";
 import { hostname } from "node:os";
-import { RabbitMQConsumer } from "./rabbitmq-consumers";
-import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
+import { RabbitOptionsFactory } from "../rabbitmq.interfaces";
 import {
   ConnectionType,
-  RabbitMQConsumerChannel,
   RabbitMQModuleOptions,
-} from "./rabbitmq.types";
-import { merge } from "./helper";
+} from "../rabbitmq.types";
+import { merge } from "../helper";
+import ExchangeManager from "./exchange-manager";
+import ConsumerManager from "./consumers-manager";
 
 @Injectable()
 export class AMQPConnectionManager
@@ -50,6 +49,8 @@ export class AMQPConnectionManager
   public static isConsumersLoaded: boolean = false;
   private connectionBlockedReason: string;
   private consumers: ChannelWrapper[] = [];
+  private exchangeManager: ExchangeManager;
+  private consumerManager: ConsumerManager;
 
   constructor(@Inject("RABBIT_OPTIONS") options: RabbitOptionsFactory) {
     AMQPConnectionManager.rabbitModuleOptions = merge(
@@ -71,7 +72,17 @@ export class AMQPConnectionManager
       AMQPConnectionManager.rabbitModuleOptions.extraOptions.consumerManualLoad
     )
       return;
-    await this.createConsumers();
+    this.consumerManager = new ConsumerManager(
+      this.consumers,
+      AMQPConnectionManager.consumerConn,
+      AMQPConnectionManager.rabbitModuleOptions,
+      AMQPConnectionManager.publishChannelWrapper,
+      this.logger,
+    );
+    AMQPConnectionManager.isConsumersLoaded =
+      await this.consumerManager.createConsumers(
+        AMQPConnectionManager.rabbitModuleOptions.consumerChannels,
+      );
 
     this.logger.debug("Initiating RabbitMQ consumers automatically");
   }
@@ -105,38 +116,45 @@ export class AMQPConnectionManager
     };
 
     await new Promise((resolve) => {
-      AMQPConnectionManager.consumerConn = connect(
-        AMQPConnectionManager.rabbitModuleOptions.connectionString,
-        {
-          ...params,
-          connectionOptions: {
-            clientProperties: {
-              connection_name: `${process.env?.npm_package_name ?? process.env.SERVICE_NAME}-${hostname()}-consumer`,
-            },
-          },
-        },
+      AMQPConnectionManager.consumerConn = this.createConnection(
+        params,
+        "consumer",
       );
-
       this.attachEvents("consumer", resolve);
     });
 
     await new Promise((resolve) => {
-      AMQPConnectionManager.publisherConn = connect(
-        AMQPConnectionManager.rabbitModuleOptions.connectionString,
-        {
-          ...params,
-          connectionOptions: {
-            clientProperties: {
-              connection_name: `${process.env?.npm_package_name ?? process.env.SERVICE_NAME}-${hostname()}-publisher`,
-            },
-          },
-        },
+      AMQPConnectionManager.publisherConn = this.createConnection(
+        params,
+        "publisher",
       );
-
       this.attachEvents("publisher", resolve);
     });
 
-    await this.assertExchanges();
+    this.exchangeManager = new ExchangeManager(
+      this.getConnection("publisher"),
+      this.logger,
+    );
+    AMQPConnectionManager.publishChannelWrapper =
+      await this.exchangeManager.createPublishChannel();
+
+    await this.exchangeManager.assert(
+      AMQPConnectionManager.rabbitModuleOptions?.assertExchanges ?? [],
+    );
+  }
+
+  private createConnection(
+    params: any,
+    type: "publisher" | "consumer",
+  ): AmqpConnectionManager {
+    return connect(AMQPConnectionManager.rabbitModuleOptions.connectionString, {
+      ...params,
+      connectionOptions: {
+        clientProperties: {
+          connection_name: `${process.env?.npm_package_name ?? process.env.SERVICE_NAME}-${hostname()}-${type}`,
+        },
+      },
+    });
   }
 
   private attachEvents(type: ConnectionType, resolve: any) {
@@ -193,95 +211,7 @@ export class AMQPConnectionManager
   public getConnection(type: ConnectionType) {
     if (type === "publisher") {
       return AMQPConnectionManager.publisherConn;
-    } else {
-      return AMQPConnectionManager.consumerConn;
     }
-  }
-
-  private async assertExchanges(): Promise<void> {
-    await new Promise((resolve) => {
-      AMQPConnectionManager.publishChannelWrapper = this.getConnection(
-        "publisher",
-      ).createChannel({
-        name: `${process.env.npm_package_name}_publish`,
-        confirm: true,
-        publishTimeout: 60000,
-      });
-
-      AMQPConnectionManager.publishChannelWrapper.on("connect", () => {
-        this.logger.debug("Initiating RabbitMQ producers");
-        resolve(true);
-      });
-
-      AMQPConnectionManager.publishChannelWrapper.on("close", () => {
-        this.logger.debug("Closing RabbitMQ producer channel");
-      });
-
-      AMQPConnectionManager.publishChannelWrapper.on("error", (err, info) => {
-        this.logger.error("Cannot open publish channel", err, info);
-      });
-    });
-
-    for (const publisher of AMQPConnectionManager.rabbitModuleOptions
-      ?.assertExchanges ?? []) {
-      await AMQPConnectionManager.publishChannelWrapper.addSetup(
-        async (channel: ConfirmChannel) => {
-          const isDelayed = publisher.options?.isDelayed ?? false;
-          const type = isDelayed ? "x-delayed-message" : publisher.type;
-          const argument = isDelayed
-            ? { arguments: { "x-delayed-type": publisher.type } }
-            : null;
-
-          await channel.assertExchange(publisher.name, type, {
-            durable: publisher?.options?.durable ?? true,
-            autoDelete: publisher?.options?.autoDelete ?? false,
-            ...argument,
-          });
-        },
-      );
-    }
-  }
-
-  private async createConsumers(): Promise<void> {
-    const consumerList =
-      AMQPConnectionManager.rabbitModuleOptions.consumerChannels ?? [];
-
-    this.checkDuplicatedQueues(consumerList);
-
-    for (const consumerEntry of consumerList) {
-      const consumer = consumerEntry.options;
-
-      this.consumers.push(
-        await new RabbitMQConsumer(
-          AMQPConnectionManager.consumerConn,
-          AMQPConnectionManager.rabbitModuleOptions,
-          AMQPConnectionManager.publishChannelWrapper,
-        ).createConsumer(consumer, consumerEntry.messageHandler),
-      );
-    }
-
-    AMQPConnectionManager.isConsumersLoaded = true;
-  }
-
-  private checkDuplicatedQueues(consumerList: RabbitMQConsumerChannel[]): void {
-    const queueNameList = [];
-    consumerList.map((curr) => queueNameList.push(curr.options.queue));
-    const dedupList = new Set(queueNameList);
-
-    if (dedupList.size != queueNameList.length) {
-      this.logger.error({
-        error: "duplicated_queues",
-        description: "Cannot have multiple queues on different binds",
-        queues: Array.from(
-          new Set(
-            queueNameList.filter(
-              (value, index) => queueNameList.indexOf(value) != index,
-            ),
-          ),
-        ),
-      });
-
-      process.exit(-1);
-    }
+    return AMQPConnectionManager.consumerConn;
   }
 }

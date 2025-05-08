@@ -1,10 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { RabbitMQModule, RabbitMQService } from "../src";
-import { AMQPConnectionManager } from "../src/amqp-connection-manager";
 import { RmqTestConfig } from "./fixtures/configs/rmq-test.config";
 import { RmqTestModule } from "./fixtures/rmq-test.module";
 import { RmqTestService } from "./fixtures/rmq-test.service";
 import { Logger } from "@nestjs/common";
+import { AMQPConnectionManager } from "../src/manager/amqp-connection-manager";
 
 describe("CrashedConnection", () => {
   let rabbitMqService: RabbitMQService;

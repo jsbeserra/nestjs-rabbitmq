@@ -1,6 +1,6 @@
 import { TestingModule, Test } from "@nestjs/testing";
 import { RabbitMQService, RabbitMQModule } from "../src";
-import { AMQPConnectionManager } from "../src/amqp-connection-manager";
+import { AMQPConnectionManager } from "../src/manager/amqp-connection-manager";
 import { RmqTestManualConsumerConfig } from "./fixtures/configs/rmq-test-manual-consumer.config";
 import { RmqTestModule } from "./fixtures/rmq-test.module";
 import { RabbitMQConsumer } from "../src/rabbitmq-consumers";
@@ -11,14 +11,8 @@ import { RmqTestService } from "./fixtures/rmq-test.service";
 describe("AMQPConnectionManager Late Loading", () => {
   let rabbitMqService: RabbitMQService;
   let moduleRef: TestingModule;
-  let createConsumersSpy: jest.SpyInstance<any, unknown[], any>;
-
+  let amqpConnectionManager: AMQPConnectionManager;
   beforeAll(async () => {
-    createConsumersSpy = jest.spyOn(
-      AMQPConnectionManager.prototype as any,
-      "createConsumers",
-    );
-
     moduleRef = await Test.createTestingModule({
       imports: [
         RmqTestModule,
@@ -32,6 +26,7 @@ describe("AMQPConnectionManager Late Loading", () => {
     moduleRef = await moduleRef.init();
     moduleRef.useLogger(false);
     rabbitMqService = moduleRef.get(RabbitMQService);
+    amqpConnectionManager = moduleRef.get(AMQPConnectionManager);
 
     await AMQPConnectionManager.publishChannelWrapper.waitForConnect();
   });
@@ -41,7 +36,7 @@ describe("AMQPConnectionManager Late Loading", () => {
   });
 
   it("should not call createConsumers", () => {
-    expect(createConsumersSpy).toHaveBeenCalledTimes(0);
+    expect(amqpConnectionManager.getConsumers().length).toBe(0);
   });
 
   it("should begin consumers manually", async () => {
@@ -66,7 +61,7 @@ describe("AMQPConnectionManager Late Loading", () => {
     const loggerSpy = jest.spyOn(Logger.prototype, "log");
     jest
       .spyOn(RmqTestService.prototype, "messageHandler")
-      .mockImplementation(async () => {});
+      .mockImplementation(async () => { });
 
     const isPublished = await rabbitMqService.publish(
       TestConsumers[0].exchangeName,

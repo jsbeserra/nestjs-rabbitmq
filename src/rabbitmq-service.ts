@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import { AMQPConnectionManager } from "./amqp-connection-manager";
+import { AMQPConnectionManager } from "./manager/amqp-connection-manager";
 import { LogType } from "./rabbitmq.types";
 import { RabbitMQConsumer } from "./rabbitmq-consumers";
 import { ChannelWrapper } from "amqp-connection-manager";
