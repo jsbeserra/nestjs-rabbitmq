@@ -1,5 +1,5 @@
 import { DynamicModule, Module, Type } from "@nestjs/common";
-import { AMQPConnectionManager } from "./amqp-connection-manager";
+import { AMQPConnectionManager } from "./manager/amqp-connection-manager";
 import { RabbitMQService } from "./rabbitmq-service";
 import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
 

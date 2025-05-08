@@ -1,6 +1,6 @@
 import { TestingModule, Test } from "@nestjs/testing";
 import { RabbitMQService, RabbitMQModule } from "../src";
-import { AMQPConnectionManager } from "../src/amqp-connection-manager";
+import { AMQPConnectionManager } from "../src/manager/amqp-connection-manager";
 import { RmqTestManualConsumerConfig } from "./fixtures/configs/rmq-test-manual-consumer.config";
 import { RmqTestModule } from "./fixtures/rmq-test.module";
 import { RabbitMQConsumer } from "../src/rabbitmq-consumers";

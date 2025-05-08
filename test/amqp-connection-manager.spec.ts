@@ -9,7 +9,7 @@ import { RmqTestModule } from "./fixtures/rmq-test.module";
 import { RabbitMQModule } from "../src/rabbitmq.module";
 import { RmqTestService } from "./fixtures/rmq-test.service";
 import { RabbitMQService } from "../src/rabbitmq-service";
-import { AMQPConnectionManager } from "../src/amqp-connection-manager";
+import { AMQPConnectionManager } from "../src/manager/amqp-connection-manager";
 import { once } from "events";
 import { RabbitMQConsumer } from "../src/rabbitmq-consumers";
 import { Logger } from "@nestjs/common";

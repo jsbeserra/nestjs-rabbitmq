@@ -2,8 +2,8 @@ import ChannelWrapper from "amqp-connection-manager/dist/types/ChannelWrapper";
 import {
   RabbitMQConsumerChannel,
   RabbitMQModuleOptions,
-} from "./rabbitmq.types";
-import { RabbitMQConsumer } from "./rabbitmq-consumers";
+} from "../rabbitmq.types";
+import { RabbitMQConsumer } from "../rabbitmq-consumers";
 import { AmqpConnectionManager } from "amqp-connection-manager";
 import { Logger } from "@nestjs/common";
 

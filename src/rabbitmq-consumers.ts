@@ -2,7 +2,7 @@ import { Logger } from "@nestjs/common";
 import { AmqpConnectionManager, ChannelWrapper } from "amqp-connection-manager";
 import { ConfirmChannel, ConsumeMessage } from "amqplib";
 import stringify from "faster-stable-stringify";
-import { AMQPConnectionManager } from "./amqp-connection-manager";
+import { AMQPConnectionManager } from "./manager/amqp-connection-manager";
 import { merge, tryParseJson } from "./helper";
 import { IRabbitHandler } from "./rabbitmq.interfaces";
 import {
@@ -22,11 +22,7 @@ type InspectInput = {
 
 export class RabbitMQConsumer {
   private logger: Console | Logger;
-
-  private readonly connection: AmqpConnectionManager;
-  private readonly options: RabbitMQModuleOptions;
   private readonly delayExchange: string;
-  private readonly publishChannel: ChannelWrapper;
   private readonly logType: LogType;
   private defaultConsumerOptions: Partial<RabbitMQConsumerOptions> = {
     autoAck: true,
@@ -45,15 +41,11 @@ export class RabbitMQConsumer {
   };
 
   constructor(
-    connection: AmqpConnectionManager,
-    options: RabbitMQModuleOptions,
-    publishChannelWrapper: ChannelWrapper,
+    private readonly connection: AmqpConnectionManager,
+    private readonly options: RabbitMQModuleOptions,
+    private readonly publishChannel: ChannelWrapper,
   ) {
-    this.connection = connection;
-    this.options = options;
     this.delayExchange = `${this.options.delayExchangeName}.delay`;
-    this.publishChannel = publishChannelWrapper;
-
     this.logType =
       (process.env.RABBITMQ_LOG_TYPE as LogType) ??
       this.options.extraOptions.logType;
@@ -81,25 +73,8 @@ export class RabbitMQConsumer {
             deadLetterRoutingKey: `${consumer.queue}${consumer.deadLetterStrategy?.suffix ?? ".dlq"}`,
             deadLetterExchange: "",
           }),
-
-          new Promise((resolve) => {
-            if (typeof consumer.routingKey === "object") {
-              for (const rk of consumer.routingKey) {
-                channel.bindQueue(consumer.queue, consumer.exchangeName, rk);
-              }
-            } else {
-              channel.bindQueue(
-                consumer.queue,
-                consumer.exchangeName,
-                consumer.routingKey,
-              );
-            }
-
-            resolve(true);
-          }),
-
+          this.bindQueues(consumer, channel),
           this.attachRetryAndDLQ(channel, consumer),
-
           channel.consume(consumer.queue, async (message) => {
             await this.processConsumerMessage(
               message,
@@ -111,6 +86,23 @@ export class RabbitMQConsumer {
         ]);
       },
     });
+  }
+
+  private bindQueues(consumer: RabbitMQConsumerOptions, channel: ConfirmChannel): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (typeof consumer.routingKey === "object") {
+        for (const rk of consumer.routingKey) {
+          channel.bindQueue(consumer.queue, consumer.exchangeName, rk);
+        }
+      } else {
+        channel.bindQueue(
+          consumer.queue,
+          consumer.exchangeName,
+          consumer.routingKey,
+        );
+      }
+      resolve(true);
+    })
   }
 
   private async processConsumerMessage(
@@ -156,14 +148,7 @@ export class RabbitMQConsumer {
   ): Promise<void> {
     const deadletterQueue = `${consumer.queue}${consumer.deadLetterStrategy?.suffix ?? ".dlq"}`;
     await channel.assertQueue(deadletterQueue, { durable: true });
-
-    if (consumer?.retryStrategy?.enabled == false) {
-      await channel.unbindQueue(
-        consumer.queue,
-        this.delayExchange,
-        consumer.queue,
-      );
-    } else {
+    if (consumer?.retryStrategy?.enabled !== false) {
       await channel.assertExchange(this.delayExchange, "x-delayed-message", {
         durable: true,
         arguments: { "x-delayed-type": "direct" },
@@ -173,49 +158,52 @@ export class RabbitMQConsumer {
         this.delayExchange,
         consumer.queue,
       );
+      return
     }
+
+    await channel.unbindQueue(
+      consumer.queue,
+      this.delayExchange,
+      consumer.queue,
+    );
   }
 
   private async processRetry(
     consumer: RabbitMQConsumerOptions,
     message: ConsumeMessage,
   ): Promise<boolean> {
-    let isPublished = false;
+    if (!this.canRetry(consumer)) return false
+    const retryCount = message.properties?.headers?.["x-retries-count"] ?? 0;
+    const maxRetry = consumer.retryStrategy.maxAttempts;
 
-    if (
-      consumer.retryStrategy === undefined ||
-      consumer.retryStrategy.enabled === undefined ||
-      consumer?.retryStrategy.enabled
-    ) {
-      const retryCount = message.properties?.headers?.["x-retries-count"] ?? 0;
-      const maxRetry = consumer.retryStrategy.maxAttempts;
-
-      if (retryCount < maxRetry) {
-        const retryDelay = consumer.retryStrategy.delay(retryCount);
-
-        try {
-          isPublished = await this.publishChannel.publish(
-            this.delayExchange,
-            consumer.queue,
-            stringify(tryParseJson(message.content.toString("utf8"))),
-            {
-              headers: {
-                ...message.properties.headers,
-                "x-retries-count": retryCount + 1,
-                "x-delay": retryDelay,
-              },
-              deliveryMode: 2, //persistent message
-              persistent: true,
+    if (retryCount < maxRetry) {
+      const retryDelay = consumer.retryStrategy.delay(retryCount);
+      try {
+        return await this.publishChannel.publish(
+          this.delayExchange,
+          consumer.queue,
+          stringify(tryParseJson(message.content.toString("utf8"))),
+          {
+            headers: {
+              ...message.properties.headers,
+              "x-retries-count": retryCount + 1,
+              "x-delay": retryDelay,
             },
-          );
-        } catch (e) {
-          this.logger.error({ message: "could_not_retry", error: e });
-          isPublished = false;
-        }
+            deliveryMode: 2,
+            persistent: true,
+          },
+        );
+      } catch (e) {
+        this.logger.error({ message: "could_not_retry", error: e });
+        return false
       }
     }
+  }
 
-    return isPublished;
+  private canRetry(consumer: RabbitMQConsumerOptions): boolean {
+    return consumer.retryStrategy === undefined ||
+      consumer.retryStrategy.enabled === undefined ||
+      consumer?.retryStrategy.enabled
   }
 
   private inspectConsumer(args: InspectInput): void {
@@ -263,17 +251,12 @@ export class RabbitMQConsumer {
       this.logger.error("Could not acknowledge message, Connection is offline");
       return;
     }
-
-    if ((!hasErrors && consumer?.autoAck) || (hasErrors && hasRetried)) {
+    if (this.canAck(hasErrors, consumer, hasRetried)) {
       channel.ack(message);
     } else if (hasErrors && !hasRetried) {
       let shouldNack = true;
-
       try {
-        shouldNack =
-          (await consumer.deadLetterStrategy?.callback?.(
-            message.content.toString("utf8"),
-          )) ?? true;
+        shouldNack = await this.shouldNackMessage(consumer, message);
       } catch (e) {
         this.logger.error({
           type: "consumer",
@@ -285,12 +268,22 @@ export class RabbitMQConsumer {
           },
         });
       }
-
       if (shouldNack) {
         channel.nack(message, false, false);
       } else {
         channel.ack(message);
       }
     }
+  }
+
+  private canAck(hasErrors: boolean, consumer: RabbitMQConsumerOptions, hasRetried: boolean) {
+    return (!hasErrors && consumer?.autoAck) || (hasErrors && hasRetried)
+  }
+
+  private async shouldNackMessage(consumer: RabbitMQConsumerOptions, message: ConsumeMessage): Promise<boolean> {
+    const deadLetterCallback = consumer.deadLetterStrategy?.callback;
+    const messageContent = message.content.toString("utf8");
+    const result = await deadLetterCallback(messageContent);
+    return result ?? true;
   }
 }

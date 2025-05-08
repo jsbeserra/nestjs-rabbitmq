@@ -12,12 +12,12 @@ import {
   connect,
 } from "amqp-connection-manager";
 import { hostname } from "node:os";
-import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
+import { RabbitOptionsFactory } from "../rabbitmq.interfaces";
 import {
   ConnectionType,
   RabbitMQModuleOptions,
-} from "./rabbitmq.types";
-import { merge } from "./helper";
+} from "../rabbitmq.types";
+import { merge } from "../helper";
 import ExchangeManager from "./exchange-manager";
 import ConsumerManager from "./consumers-manager";
 
