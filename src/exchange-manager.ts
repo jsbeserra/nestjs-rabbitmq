@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Logger } from "@nestjs/common";
 import { AmqpConnectionManager, ChannelWrapper } from "amqp-connection-manager";
 import { ConfirmChannel } from "amqplib";
 import { RabbitMQAssertExchange } from "./rabbitmq.types";

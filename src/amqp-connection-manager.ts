@@ -5,7 +5,6 @@ import {
   OnApplicationBootstrap,
   OnApplicationShutdown,
   OnModuleInit,
-  Param,
 } from "@nestjs/common";
 import {
   AmqpConnectionManager,
@@ -13,11 +12,9 @@ import {
   connect,
 } from "amqp-connection-manager";
 import { hostname } from "node:os";
-import { RabbitMQConsumer } from "./rabbitmq-consumers";
 import { RabbitOptionsFactory } from "./rabbitmq.interfaces";
 import {
   ConnectionType,
-  RabbitMQConsumerChannel,
   RabbitMQModuleOptions,
 } from "./rabbitmq.types";
 import { merge } from "./helper";

@@ -5,7 +5,7 @@ import {
 } from "./rabbitmq.types";
 import { RabbitMQConsumer } from "./rabbitmq-consumers";
 import { AmqpConnectionManager } from "amqp-connection-manager";
-import { Injectable, Logger } from "@nestjs/common";
+import { Logger } from "@nestjs/common";
 
 
 export default class ConsumerManager {

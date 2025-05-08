@@ -69,7 +69,7 @@ export class RabbitMQConsumer {
   ): Promise<ChannelWrapper> {
     consumer = merge(this.defaultConsumerOptions, consumer);
 
-    const consumerChannel = this.connection.createChannel({
+    return this.connection.createChannel({
       confirm: true,
       name: consumer.queue,
       setup: (channel: ConfirmChannel) => {
@@ -111,8 +111,6 @@ export class RabbitMQConsumer {
         ]);
       },
     });
-
-    return consumerChannel;
   }
 
   private async processConsumerMessage(
